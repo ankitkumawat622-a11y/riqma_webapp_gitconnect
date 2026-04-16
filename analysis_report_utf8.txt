@@ -1,0 +1,35 @@
+﻿Analyzing riqma-webapp...                                       
+
+warning - The receiver can't be 'null' because of short-circuiting, so the null-aware operator '?.' can't be used - lib\layout\main_layout.dart:148:81 - invalid_null_aware_operator
+   info - The private field _refIdToName could be 'final' - lib\screens\audit_review_screen.dart:39:23 - prefer_final_fields
+   info - Use 'whereType' to select elements of a given type - lib\screens\audit_review_screen.dart:1658:33 - prefer_iterable_wheretype
+warning - A value for optional parameter 'key' isn't ever given - lib\screens\audit_review_screen.dart:2415:41 - unused_element_parameter
+warning - A value for optional parameter 'key' isn't ever given - lib\screens\audit_review_screen.dart:2473:28 - unused_element_parameter
+   info - The private field _refIdToName could be 'final' - lib\screens\auditor_self_review_screen.dart:29:23 - prefer_final_fields
+warning - Unnecessary cast - lib\screens\auditor_self_review_screen.dart:351:22 - unnecessary_cast
+warning - Unnecessary cast - lib\screens\auditor_self_review_screen.dart:352:22 - unnecessary_cast
+warning - The declaration '_showSearchSelectionDialog' isn't referenced - lib\screens\auditor_self_review_screen.dart:722:19 - unused_element
+warning - Unnecessary cast - lib\screens\auditor_self_review_screen.dart:1219:86 - unnecessary_cast
+warning - Unnecessary cast - lib\screens\auditor_self_review_screen.dart:1240:85 - unnecessary_cast
+warning - The value of the local variable 'referenceName' isn't used - lib\screens\auditor_self_review_screen.dart:2268:18 - unused_local_variable
+warning - A value for optional parameter 'key' isn't ever given - lib\screens\auditor_self_review_screen.dart:3009:41 - unused_element_parameter
+warning - A value for optional parameter 'key' isn't ever given - lib\screens\auditor_self_review_screen.dart:3066:28 - unused_element_parameter
+warning - The value of the local variable 'statusBgColor' isn't used - lib\screens\dashboard\auditor_main_dashboard.dart:1525:21 - unused_local_variable
+warning - The declaration '_showFieldAppGuide' isn't referenced - lib\screens\manage\bulk_task_entry_screen.dart:402:8 - unused_element
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\manage\nc_categories_view.dart:115:42 - use_build_context_synchronously
+warning - The type argument(s) of the constructor 'List.from' can't be inferred - lib\screens\manage\nc_categories_view.dart:157:28 - inference_failure_on_instance_creation
+   info - Unnecessary use of multiple underscores - lib\screens\manage\nc_categories_view.dart:251:41 - unnecessary_underscores
+warning - The type argument(s) of the function 'showDialog' can't be inferred - lib\screens\manage\others_config_view.dart:21:11 - inference_failure_on_function_invocation
+warning - The type argument(s) of the function 'showDialog' can't be inferred - lib\screens\manage\others_config_view.dart:85:11 - inference_failure_on_function_invocation
+warning - Unnecessary cast - lib\screens\manage\others_config_view.dart:124:63 - unnecessary_cast
+   info - Unnecessary use of multiple underscores - lib\screens\manage\others_config_view.dart:232:43 - unnecessary_underscores
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\manage\root_causes_view.dart:118:40 - use_build_context_synchronously
+warning - The type argument(s) of the constructor 'List.from' can't be inferred - lib\screens\manage\root_causes_view.dart:156:28 - inference_failure_on_instance_creation
+   info - Unnecessary use of multiple underscores - lib\screens\manage\root_causes_view.dart:229:41 - unnecessary_underscores
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\manage\tasks_view.dart:372:25 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\manage\tasks_view.dart:373:32 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\manage\tasks_view.dart:480:27 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\manage\tasks_view.dart:481:34 - use_build_context_synchronously
+   info - Statements in an if should be enclosed in a block - lib\screens\manage\turbines_view.dart:629:41 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\screens\manage\turbines_view.dart:647:43 - curly_braces_in_flow_control_structures
+

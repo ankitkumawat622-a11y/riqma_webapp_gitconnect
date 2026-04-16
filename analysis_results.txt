@@ -1,0 +1,145 @@
+﻿Analyzing riqma-webapp...                                       
+
+   info - Sort directive sections alphabetically - lib\auth_wrapper.dart:2:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\auth_wrapper.dart:3:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\auth_wrapper.dart:5:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\layout\main_layout.dart:3:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\layout\main_layout.dart:4:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\layout\main_layout.dart:6:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\layout\main_layout.dart:8:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\layout\main_layout.dart:11:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\layout\main_layout.dart:13:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\main.dart:4:1 - directives_ordering
+   info - Place 'dart:' imports before other imports - lib\playground\audit_ui_lab.dart:3:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\activity_log_screen.dart:4:1 - directives_ordering
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\activity_log_screen.dart:52:13 - unawaited_futures
+   info - Use 'const' with the constructor to improve performance - lib\screens\activity_log_screen.dart:352:21 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\activity_log_screen.dart:375:29 - prefer_const_constructors
+   info - Sort directive sections alphabetically - lib\screens\audit_review_screen.dart:2:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\audit_review_screen.dart:4:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\audit_review_screen.dart:6:1 - directives_ordering
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\audit_review_screen.dart:349:7 - unawaited_futures
+   info - Use 'const' with the constructor to improve performance - lib\screens\audit_review_screen.dart:1337:26 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\audit_review_screen.dart:1358:27 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\audit_review_screen.dart:1374:27 - prefer_const_constructors
+warning - A value for optional parameter 'key' isn't ever given - lib\screens\audit_review_screen.dart:2415:41 - unused_element_parameter
+warning - A value for optional parameter 'key' isn't ever given - lib\screens\audit_review_screen.dart:2473:28 - unused_element_parameter
+   info - Sort directive sections alphabetically - lib\screens\auditor_dashboard.dart:2:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\auditor_dashboard.dart:3:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\auditor_self_review_screen.dart:2:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\auditor_self_review_screen.dart:4:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\auditor_self_review_screen.dart:6:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\auditor_self_review_screen.dart:7:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\auditor_self_review_screen.dart:10:1 - directives_ordering
+warning - Unnecessary cast - lib\screens\auditor_self_review_screen.dart:351:22 - unnecessary_cast
+warning - Unnecessary cast - lib\screens\auditor_self_review_screen.dart:352:22 - unnecessary_cast
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\auditor_self_review_screen.dart:384:7 - unawaited_futures
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\auditor_self_review_screen.dart:548:7 - unawaited_futures
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\auditor_self_review_screen.dart:634:7 - unawaited_futures
+warning - Unnecessary cast - lib\screens\auditor_self_review_screen.dart:1114:86 - unnecessary_cast
+warning - Unnecessary cast - lib\screens\auditor_self_review_screen.dart:1135:85 - unnecessary_cast
+   info - Use 'const' with the constructor to improve performance - lib\screens\auditor_self_review_screen.dart:1688:26 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\auditor_self_review_screen.dart:1709:27 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\auditor_self_review_screen.dart:1725:27 - prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\screens\auditor_self_review_screen.dart:2186:20 - prefer_const_literals_to_create_immutables
+   info - Use 'const' with the constructor to improve performance - lib\screens\auditor_self_review_screen.dart:2187:11 - prefer_const_constructors
+warning - A value for optional parameter 'key' isn't ever given - lib\screens\auditor_self_review_screen.dart:2904:41 - unused_element_parameter
+warning - A value for optional parameter 'key' isn't ever given - lib\screens\auditor_self_review_screen.dart:2961:28 - unused_element_parameter
+   info - Sort directive sections alphabetically - lib\screens\dashboard\auditor_main_dashboard.dart:7:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\dashboard\auditor_main_dashboard.dart:9:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\dashboard\auditor_main_dashboard.dart:10:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\dashboard\auditor_main_dashboard.dart:11:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\dashboard\auditor_main_dashboard.dart:12:1 - directives_ordering
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\dashboard\auditor_main_dashboard.dart:59:5 - unawaited_futures
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\dashboard\auditor_main_dashboard.dart:122:9 - unawaited_futures
+   info - Unnecessary 'await' - lib\screens\dashboard\auditor_main_dashboard.dart:265:38 - unnecessary_await_in_return
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\dashboard\auditor_main_dashboard.dart:433:21 - unawaited_futures
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\dashboard\auditor_main_dashboard.dart:441:22 - unawaited_futures
+warning - The value of the local variable 'statusBgColor' isn't used - lib\screens\dashboard\auditor_main_dashboard.dart:1525:21 - unused_local_variable
+   info - Sort directive sections alphabetically - lib\screens\dashboard\main_dashboard_screen.dart:6:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\dashboard\main_dashboard_screen.dart:9:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\five_s\five_s_dashboard_screen.dart:3:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\five_s\five_s_form_screen.dart:3:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\five_s\five_s_form_screen.dart:4:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\five_s\five_s_reports_screen.dart:3:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\kaizen\tabs\training_materials_tab.dart:4:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\login_screen.dart:2:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\login_screen.dart:4:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\login_screen.dart:5:1 - directives_ordering
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage\bulk_site_entry_screen.dart:732:13 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage\bulk_site_entry_screen.dart:742:13 - prefer_const_constructors
+   info - Sort directive sections alphabetically - lib\screens\manage\bulk_task_entry_screen.dart:7:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\manage\bulk_task_entry_screen.dart:9:1 - directives_ordering
+warning - The declaration '_showFieldAppGuide' isn't referenced - lib\screens\manage\bulk_task_entry_screen.dart:402:8 - unused_element
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage\bulk_task_entry_screen.dart:711:13 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage\bulk_task_entry_screen.dart:721:13 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage\bulk_turbine_entry_screen.dart:796:13 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage\bulk_turbine_entry_screen.dart:804:13 - prefer_const_constructors
+   info - Sort directive sections alphabetically - lib\screens\manage\main_categories_view.dart:6:1 - directives_ordering
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\manage\main_categories_view.dart:197:5 - unawaited_futures
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\manage\main_categories_view.dart:406:7 - unawaited_futures
+  error - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\manage\nc_categories_view.dart:114:42 - use_build_context_synchronously
+  error - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\manage\nc_categories_view.dart:118:42 - use_build_context_synchronously
+   info - Unnecessary use of multiple underscores - lib\screens\manage\nc_categories_view.dart:257:41 - unnecessary_underscores
+  error - The type argument(s) of the function 'showDialog' can't be inferred - lib\screens\manage\others_config_view.dart:21:11 - inference_failure_on_function_invocation
+  error - The type argument(s) of the function 'showDialog' can't be inferred - lib\screens\manage\others_config_view.dart:85:11 - inference_failure_on_function_invocation
+warning - Unnecessary cast - lib\screens\manage\others_config_view.dart:124:34 - unnecessary_cast
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\manage\others_config_view.dart:208:21 - unawaited_futures
+   info - Unnecessary use of multiple underscores - lib\screens\manage\others_config_view.dart:233:43 - unnecessary_underscores
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\manage\reference_management_screen.dart:191:7 - unawaited_futures
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage\reference_management_screen.dart:469:35 - prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\screens\manage\reference_management_screen.dart:470:35 - prefer_const_literals_to_create_immutables
+  error - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\manage\root_causes_view.dart:117:40 - use_build_context_synchronously
+  error - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\screens\manage\root_causes_view.dart:121:40 - use_build_context_synchronously
+   info - Unnecessary use of multiple underscores - lib\screens\manage\root_causes_view.dart:235:41 - unnecessary_underscores
+   info - Sort directive sections alphabetically - lib\screens\manage\sites_view.dart:7:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\manage\sites_view.dart:8:1 - directives_ordering
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\manage\sites_view.dart:166:5 - unawaited_futures
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\manage\sites_view.dart:343:7 - unawaited_futures
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\manage\states_view.dart:200:7 - unawaited_futures
+   info - Sort directive sections alphabetically - lib\screens\manage\sub_categories_view.dart:7:1 - directives_ordering
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\manage\sub_categories_view.dart:205:5 - unawaited_futures
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\manage\sub_categories_view.dart:382:7 - unawaited_futures
+   info - Sort directive sections alphabetically - lib\screens\manage\tasks_view.dart:7:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\manage\tasks_view.dart:8:1 - directives_ordering
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage\tasks_view.dart:540:33 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage\tasks_view.dart:589:27 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage\tasks_view.dart:612:27 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage\tasks_view.dart:637:29 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage\tasks_view.dart:670:29 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage\tasks_view.dart:714:27 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage\tasks_view.dart:761:27 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage\tasks_view.dart:793:27 - prefer_const_constructors
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\manage\turbine_models_view.dart:336:7 - unawaited_futures
+   info - Sort directive sections alphabetically - lib\screens\manage\turbines_view.dart:7:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\manage\turbines_view.dart:8:1 - directives_ordering
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\manage\turbines_view.dart:315:7 - unawaited_futures
+   info - Sort directive sections alphabetically - lib\screens\manage_data_screen.dart:4:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\manage_data_screen.dart:7:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\manage_data_screen.dart:10:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\manage_data_screen.dart:11:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\manage_data_screen.dart:12:1 - directives_ordering
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage_data_screen.dart:47:26 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage_data_screen.dart:48:25 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\manage_data_screen.dart:49:27 - prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\screens\planning_screen.dart:294:33 - prefer_const_literals_to_create_immutables
+   info - Sort directive sections alphabetically - lib\screens\reports\digital_sqa_report_screen.dart:3:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\reports\digital_sqa_report_screen.dart:6:1 - directives_ordering
+   info - Place 'dart:' imports before other imports - lib\screens\reports\digital_sqa_report_screen.dart:11:1 - directives_ordering
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\reports\digital_sqa_report_screen.dart:341:5 - unawaited_futures
+   info - Sort directive sections alphabetically - lib\screens\reports\final_reports_screen.dart:15:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\user_management_screen.dart:3:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\screens\user_management_screen.dart:4:1 - directives_ordering
+   info - Missing an 'await' for the 'Future' computed by this expression - lib\screens\user_management_screen.dart:62:7 - unawaited_futures
+   info - Sort directive sections alphabetically - lib\services\excel_export_service.dart:4:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\services\excel_export_service.dart:6:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\services\excel_export_service.dart:8:1 - directives_ordering
+   info - Sort directive sections alphabetically - lib\services\excel_export_service.dart:9:1 - directives_ordering
+
+flutter : 135 issues found. (ran in 16.4s)
+At line:1 char:1
++ flutter analyze 2>&1 | Out-File -FilePath analysis_results.txt -Encod ...
++ ~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (135 issues found. (ran in 16.4s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
