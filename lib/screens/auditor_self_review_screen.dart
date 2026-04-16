@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Added for keyboard shortcuts
 import 'package:google_fonts/google_fonts.dart';
@@ -707,6 +707,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
     if (remark == null || remark.isEmpty) return; // User cancelled or empty
 
     try {
+      if (!mounted) return;
       unawaited(showDialog<void>(
         context: context,
         barrierDismissible: false,
@@ -1877,8 +1878,9 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
         ],
       ),
     ),
-  );
-}
+  ),
+);
+  }
 
   Widget _buildHeaderItem(String label, String value) {
     return Row(

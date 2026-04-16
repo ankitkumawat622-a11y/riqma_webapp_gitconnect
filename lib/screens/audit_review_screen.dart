@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -218,7 +219,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
   void _initializeMasterRemarks() {
     final remarks = widget.auditData['master_remarks'];
     if (remarks is List) {
-      _masterRemarks = List<Map<String, dynamic>>.from(remarks.map((e) => Map<String, dynamic>.from(e)));
+      _masterRemarks = List<Map<String, dynamic>>.from(remarks.map((e) => Map<String, dynamic>.from(e as Map)));
     }
   }
 
@@ -270,7 +271,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
                 border: Border.all(color: Colors.blue[100]!),
               ),
               child: Text(
-                remarkData['remark'] ?? '',
+                remarkData['remark'].toString(),
                 style: GoogleFonts.outfit(fontSize: 14),
               ),
             ),
@@ -332,7 +333,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
                             ],
                           ),
                           const SizedBox(height: 4),
-                          Text(remark['remark'] ?? '', style: GoogleFonts.outfit(fontSize: 13)),
+                          Text(remark['remark'].toString(), style: GoogleFonts.outfit(fontSize: 13)),
                         ],
                       ),
                     );
@@ -493,6 +494,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
         final remark = await _showRejectionRemarkDialog();
         if (remark == null || remark.isEmpty) return; // User cancelled or empty
 
+        if (!mounted) return;
         unawaited(showDialog<void>(
           context: context,
           barrierDismissible: false,
@@ -1392,8 +1394,6 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
                   ),
                 ),
               ),
-                ),
-              ),
               const SizedBox(width: 4),
               // Master Remark History Button
               if (_masterRemarks.isNotEmpty)
@@ -1530,8 +1530,9 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
             ],
           ),
         ),
-      );
-    }
+      ),
+    );
+  }
 
   Widget _buildHeaderItem(String label, String value) {
     return Row(
