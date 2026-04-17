@@ -324,11 +324,11 @@ class _StatesViewState extends State<StatesView> {
     return Container(
       margin: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.light ? 0.06 : 0.2),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -352,7 +352,7 @@ class _StatesViewState extends State<StatesView> {
                       style: GoogleFonts.outfit(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade700,
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
                       ),
                     ),
                   ],
@@ -378,7 +378,7 @@ class _StatesViewState extends State<StatesView> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(
               border: Border(
-                bottom: BorderSide(color: Colors.grey.shade200, width: 1),
+                bottom: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.1), width: 1),
               ),
             ),
             child: Row(
@@ -440,7 +440,7 @@ class _StatesViewState extends State<StatesView> {
                         itemCount: statesList.length,
                         separatorBuilder: (context, index) => Divider(
                           height: 1,
-                          color: Colors.grey.shade200,
+                          color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
                         ),
                         itemBuilder: (context, index) {
                           final state = statesList[index];
@@ -509,7 +509,7 @@ class _StatesViewState extends State<StatesView> {
                                         width: 36,
                                         height: 36,
                                         decoration: BoxDecoration(
-                                          color: Colors.grey.shade100,
+                                          color: Theme.of(context).brightness == Brightness.light ? Colors.grey.shade100 : Colors.white.withValues(alpha: 0.05),
                                           shape: BoxShape.circle,
                                         ),
                                         child: IconButton(

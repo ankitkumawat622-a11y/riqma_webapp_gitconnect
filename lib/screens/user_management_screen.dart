@@ -366,9 +366,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).cardTheme.color,
         elevation: 0,
         automaticallyImplyLeading: false,
         title: Row(
@@ -389,7 +389,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               style: GoogleFonts.outfit(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: const Color(0xFF1A1F36),
+                color: Theme.of(context).textTheme.titleLarge?.color,
               ),
             ),
           ],
@@ -402,7 +402,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               icon: const Icon(Icons.person_add_rounded, size: 20),
               label: Text('Add User', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1A1F36),
+                backgroundColor: Theme.of(context).brightness == Brightness.light ? const Color(0xFF1A1F36) : Colors.blue[700],
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -477,11 +477,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           return Container(
             margin: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardTheme.color,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.light ? 0.05 : 0.2),
                   blurRadius: 20,
                   offset: const Offset(0, 4),
                 ),
@@ -519,7 +519,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                       child: SizedBox(
                         width: double.infinity,
                         child: DataTable(
-                          headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
+                          headingRowColor: WidgetStateProperty.all(Theme.of(context).brightness == Brightness.light ? Colors.grey.shade50 : Colors.white.withValues(alpha: 0.05)),
                           headingRowHeight: 56,
                           dataRowMinHeight: 64,
                           dataRowMaxHeight: 72,
@@ -530,16 +530,16 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                               label: Text('USER', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 12, color: Colors.grey.shade600, letterSpacing: 0.5)),
                             ),
                             DataColumn(
-                              label: Text('EMAIL', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 12, color: Colors.grey.shade600, letterSpacing: 0.5)),
+                              label: Text('EMAIL', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color, letterSpacing: 0.5)),
                             ),
                             DataColumn(
-                              label: Text('ROLE', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 12, color: Colors.grey.shade600, letterSpacing: 0.5)),
+                              label: Text('ROLE', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color, letterSpacing: 0.5)),
                             ),
                             DataColumn(
-                              label: Text('STATE', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 12, color: Colors.grey.shade600, letterSpacing: 0.5)),
+                              label: Text('STATE', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color, letterSpacing: 0.5)),
                             ),
                             DataColumn(
-                              label: Text('ACTIONS', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 12, color: Colors.grey.shade600, letterSpacing: 0.5)),
+                              label: Text('ACTIONS', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color, letterSpacing: 0.5)),
                             ),
                           ],
                           rows: users.map((user) {
@@ -562,17 +562,17 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                                       ),
                                       const SizedBox(width: 12),
                                       Text(
-                                        user['name']?.toString() ?? 'N/A',
-                                        style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14),
-                                      ),
+                                          user['name']?.toString() ?? 'N/A',
+                                          style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14, color: Theme.of(context).textTheme.bodyLarge?.color),
+                                        ),
                                     ],
                                   ),
                                 ),
                                 DataCell(
-                                  Text(
-                                    user['email']?.toString() ?? 'N/A',
-                                    style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey.shade700),
-                                  ),
+                                    Text(
+                                      user['email']?.toString() ?? 'N/A',
+                                      style: GoogleFonts.outfit(fontSize: 14, color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7)),
+                                    ),
                                 ),
                                 DataCell(
                                   Container(
@@ -606,7 +606,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                                       const SizedBox(width: 6),
                                       Text(
                                         user['assigned_state']?.toString() ?? 'N/A',
-                                        style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey.shade700),
+                                        style: GoogleFonts.outfit(fontSize: 14, color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7)),
                                       ),
                                     ],
                                   ),

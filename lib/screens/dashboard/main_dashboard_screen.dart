@@ -28,7 +28,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
             style: GoogleFonts.outfit(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF1A1F36),
+              color: Theme.of(context).textTheme.titleLarge?.color,
             ),
           ),
           const SizedBox(height: 24),
@@ -39,7 +39,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
             style: GoogleFonts.outfit(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: const Color(0xFF1A1F36),
+              color: Theme.of(context).textTheme.titleLarge?.color,
             ),
           ),
           const SizedBox(height: 16),
@@ -50,7 +50,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
             style: GoogleFonts.outfit(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: const Color(0xFF1A1F36),
+              color: Theme.of(context).textTheme.titleLarge?.color,
             ),
           ),
           const SizedBox(height: 16),
@@ -142,11 +142,11 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardTheme.color,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.light ? 0.04 : 0.2),
               blurRadius: 24,
               offset: const Offset(0, 8),
             ),
@@ -185,7 +185,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
                   style: GoogleFonts.outfit(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: const Color(0xFF1A1F36),
+                    color: Theme.of(context).textTheme.titleLarge?.color,
                   ),
                 );
               },
@@ -197,7 +197,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.outfit(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -280,7 +280,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withValues(alpha: Theme.of(context).brightness == Brightness.light ? 0.2 : 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: Colors.white, size: 28),

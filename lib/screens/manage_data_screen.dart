@@ -25,15 +25,11 @@ class ManageDataScreen extends StatelessWidget {
           Container(
             margin: const EdgeInsets.only(left: 8, right: 8),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.white, Colors.grey.shade50],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
+              color: Theme.of(context).cardTheme.color,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
+                  color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.light ? 0.08 : 0.2),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -42,7 +38,7 @@ class ManageDataScreen extends StatelessWidget {
             child: TabBar(
               isScrollable: true,
               labelColor: const Color(0xFF0277BD),
-              unselectedLabelColor: Colors.grey.shade600,
+              unselectedLabelColor: Theme.of(context).textTheme.bodySmall?.color,
               indicatorSize: TabBarIndicatorSize.label,
               indicator: const BoxDecoration(
                 border: Border(

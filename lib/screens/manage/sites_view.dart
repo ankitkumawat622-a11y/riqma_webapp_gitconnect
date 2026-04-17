@@ -512,10 +512,14 @@ class _SitesViewState extends State<SitesView> {
     return Container(
       margin: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 20, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.light ? 0.06 : 0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -531,7 +535,7 @@ class _SitesViewState extends State<SitesView> {
                     Icon(Icons.list_alt_rounded, color: Colors.grey.shade600, size: 20),
                     const SizedBox(width: 8),
                     if (!_isSearching) ...[
-                      Text('${sitesList.length} Sites', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+                      Text('${sitesList.length} Sites', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: Theme.of(context).textTheme.bodyLarge?.color)),
                       const SizedBox(width: 8),
                       IconButton(
                         onPressed: () => setState(() => _isSearching = true),
@@ -548,7 +552,7 @@ class _SitesViewState extends State<SitesView> {
                         child: TextField(
                           controller: _searchController,
                           autofocus: true,
-                          style: GoogleFonts.outfit(fontSize: 14),
+                          style: GoogleFonts.outfit(fontSize: 14, color: Theme.of(context).textTheme.bodyLarge?.color),
                           decoration: InputDecoration(
                             hintText: 'Search sites...',
                             hintStyle: GoogleFonts.outfit(fontSize: 14, color: Colors.grey.shade400),
@@ -564,7 +568,7 @@ class _SitesViewState extends State<SitesView> {
                               },
                             ),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                            fillColor: Colors.grey.shade100,
+                            fillColor: Theme.of(context).brightness == Brightness.light ? Colors.grey.shade100 : Colors.white.withValues(alpha: 0.05),
                             filled: true,
                             contentPadding: const EdgeInsets.symmetric(vertical: 0),
                           ),
@@ -631,9 +635,9 @@ class _SitesViewState extends State<SitesView> {
                         label: const Text('All States'),
                         selected: _selectedState == 'All',
                         selectedColor: const Color(0xFF0277BD).withValues(alpha: 0.2),
-                        backgroundColor: Colors.grey.shade100,
+                        backgroundColor: Theme.of(context).brightness == Brightness.light ? Colors.grey.shade100 : Colors.white.withValues(alpha: 0.05),
                         labelStyle: GoogleFonts.outfit(
-                          color: _selectedState == 'All' ? const Color(0xFF0277BD) : Colors.black87,
+                          color: _selectedState == 'All' ? const Color(0xFF0277BD) : Theme.of(context).textTheme.bodyMedium?.color,
                           fontWeight: _selectedState == 'All' ? FontWeight.w600 : FontWeight.normal,
                         ),
                         side: BorderSide.none,
@@ -656,9 +660,9 @@ class _SitesViewState extends State<SitesView> {
                               label: Text(name),
                               selected: isSelected,
                               selectedColor: const Color(0xFF0277BD).withValues(alpha: 0.2),
-                              backgroundColor: Colors.grey.shade100,
+                              backgroundColor: Theme.of(context).brightness == Brightness.light ? Colors.grey.shade100 : Colors.white.withValues(alpha: 0.05),
                               labelStyle: GoogleFonts.outfit(
-                                color: isSelected ? const Color(0xFF0277BD) : Colors.black87,
+                                color: isSelected ? const Color(0xFF0277BD) : Theme.of(context).textTheme.bodyMedium?.color,
                                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                               ),
                               side: BorderSide.none,
@@ -678,7 +682,7 @@ class _SitesViewState extends State<SitesView> {
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.grey.shade200, width: 1))),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.1), width: 1))),
             child: Row(
               children: [
                 Expanded(flex: 2, child: Text('SITE NAME', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade500, letterSpacing: 0.5))),
@@ -698,7 +702,7 @@ class _SitesViewState extends State<SitesView> {
                     : ListView.separated(
                         padding: EdgeInsets.zero,
                         itemCount: sitesList.length,
-                        separatorBuilder: (context, index) => Divider(height: 1, color: Colors.grey.shade200),
+                        separatorBuilder: (context, index) => Divider(height: 1, color: Theme.of(context).dividerColor.withValues(alpha: 0.1)),
                         itemBuilder: (context, index) {
                           final site = sitesList[index];
                           final name = site['name'] as String;

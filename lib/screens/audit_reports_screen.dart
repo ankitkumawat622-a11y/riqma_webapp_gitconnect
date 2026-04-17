@@ -260,11 +260,11 @@ class _AuditReportsScreenState extends State<AuditReportsScreen> {
         Expanded(
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardTheme.color,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
+                  color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.light ? 0.04 : 0.2),
                   blurRadius: 24,
                   offset: const Offset(0, 8),
                 ),
@@ -295,15 +295,19 @@ class _AuditReportsScreenState extends State<AuditReportsScreen> {
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.grey[50],
+                            color: Theme.of(context).brightness == Brightness.light ? Colors.grey[50] : Colors.white.withValues(alpha: 0.05),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.assignment_outlined, size: 48, color: Colors.grey[300]),
+                          child: Icon(Icons.assignment_outlined, size: 48, color: Colors.grey[400]),
                         ),
                         const SizedBox(height: 16),
                         Text(
                           'No audit reports found',
-                          style: GoogleFonts.outfit(fontSize: 18, color: Colors.grey[500], fontWeight: FontWeight.w500),
+                          style: GoogleFonts.outfit(
+                            fontSize: 18, 
+                            color: Theme.of(context).textTheme.bodySmall?.color, 
+                            fontWeight: FontWeight.w500
+                          ),
                         ),
                       ],
                     ),
@@ -321,25 +325,25 @@ class _AuditReportsScreenState extends State<AuditReportsScreen> {
                   configuration: PlutoGridConfiguration(
                     style: PlutoGridStyleConfig(
                       gridBorderColor: Colors.transparent,
-                      gridBackgroundColor: Colors.white,
-                      borderColor: const Color(0xFFF1F5F9),
-                      iconColor: Colors.white70,
+                      gridBackgroundColor: Colors.transparent,
+                      borderColor: Theme.of(context).dividerColor.withValues(alpha: 0.2),
+                      iconColor: Theme.of(context).brightness == Brightness.light ? Colors.white70 : Colors.blueGrey[200]!,
                       columnTextStyle: GoogleFonts.outfit(
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
                         color: Colors.white,
                       ),
                       cellTextStyle: GoogleFonts.outfit(
-                        color: const Color(0xFF2D3447),
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
                         fontSize: 13,
                       ),
                       rowHeight: 56,
                       columnHeight: 48,
                       columnFilterHeight: 40,
-                      activatedColor: const Color(0xFFF0F7FF),
+                      activatedColor: Theme.of(context).brightness == Brightness.light ? const Color(0xFFF0F7FF) : Colors.white.withValues(alpha: 0.05),
                       activatedBorderColor: const Color(0xFF0D7377).withValues(alpha: 0.3),
-                      oddRowColor: const Color(0xFFFAFBFC),
-                      evenRowColor: Colors.white,
+                      oddRowColor: Theme.of(context).brightness == Brightness.light ? const Color(0xFFFAFBFC) : Colors.white.withValues(alpha: 0.02),
+                      evenRowColor: Colors.transparent,
                       columnAscendingIcon: const Icon(Icons.arrow_upward_rounded, size: 14, color: Colors.white70),
                       columnDescendingIcon: const Icon(Icons.arrow_downward_rounded, size: 14, color: Colors.white70),
                     ),

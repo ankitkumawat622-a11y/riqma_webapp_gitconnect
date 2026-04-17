@@ -309,12 +309,12 @@ class _PlanningScreenState extends State<PlanningScreen> {
                       child: Container(
                         height: 48, // Match dropdown height roughly
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: Theme.of(context).cardTheme.color,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey.shade200),
+                          border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.1)),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.03),
+                              color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.light ? 0.03 : 0.2),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -334,7 +334,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
                             border: InputBorder.none,
                             contentPadding: const EdgeInsets.symmetric(vertical: 11),
                           ),
-                          style: GoogleFonts.outfit(),
+                          style: GoogleFonts.outfit(color: Theme.of(context).textTheme.bodyLarge?.color),
                         ),
                       ),
                     ),
@@ -356,7 +356,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
                               'No plans found matching filters',
                               style: GoogleFonts.outfit(
                                 fontSize: 18,
-                                color: Colors.grey[500],
+                                color: Theme.of(context).textTheme.bodySmall?.color,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -445,11 +445,11 @@ class _PlanningScreenState extends State<PlanningScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.light ? 0.04 : 0.2),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -469,7 +469,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
                       (data['site_name'] ?? 'Unknown Site').toString(),
                       style: GoogleFonts.outfit(
                         fontSize: 14,
-                        color: Colors.grey[600],
+                        color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
                         fontWeight: FontWeight.w500,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -508,7 +508,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
             style: GoogleFonts.outfit(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF1A1F36),
+              color: Theme.of(context).textTheme.titleLarge?.color,
             ),
           ),
           const Spacer(),
@@ -565,7 +565,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
               Text(
                 dateStr,
                 style: GoogleFonts.outfit(
-                  color: Colors.grey[600],
+                  color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
@@ -581,7 +581,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
                 child: Text(
                   auditors,
                   style: GoogleFonts.outfit(
-                    color: Colors.grey[600],
+                    color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
