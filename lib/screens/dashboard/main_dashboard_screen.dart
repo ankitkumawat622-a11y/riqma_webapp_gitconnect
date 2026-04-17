@@ -95,8 +95,8 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
             title: 'Pending Review',
             stream: FirebaseFirestore.instance
                 .collection('audit_submissions')
-                .where('status', whereIn: ['pending', 'pending_manager_approval'])
-                .snapshots(),
+                .where('status',
+                    whereIn: ['pending', 'pending_manager_approval', 'pending_2', 'pending_3', 'pending_4', 'correction']).snapshots(),
             countBuilder: (snapshot) => snapshot.docs.length.toString(),
             color: Colors.orange,
             icon: Icons.pending_actions_rounded,

@@ -93,19 +93,19 @@ class _AuditReportsScreenState extends State<AuditReportsScreen> {
         Color color = Colors.grey;
         String text = status;
 
-        if (status == 'pending' || status == 'pending_manager_approval') {
+        if (status == 'pending' || status == 'pending_manager_approval' || status == 'pending_review') {
           color = const Color(0xFFC2410C);
           text = 'Pending Review';
         } else if (status == 'approved') {
           color = const Color(0xFF15803D);
           text = 'Approved';
         } else if (status == 'correction') {
-          // 'correction_needed' is retired; canonical status is 'correction'
           color = const Color(0xFFB91C1C);
-          text = 'Correction';
-        } else if (status == 'pending_2') {
+          text = 'Correction Needed';
+        } else if (status.startsWith('pending_')) {
+          final count = status.split('_').last;
           color = const Color(0xFF1D4ED8);
-          text = 'Pending Review 2';
+          text = 'Review (Cycle $count)';
         }
 
         return Container(
@@ -197,7 +197,7 @@ class _AuditReportsScreenState extends State<AuditReportsScreen> {
 
     if (_selectedStatus != null) {
       if (_selectedStatus == 'pending_group') {
-        query = query.where('status', whereIn: ['pending', 'pending_manager_approval']);
+        query = query.where('status', whereIn: ['pending', 'pending_manager_approval', 'pending_2', 'pending_3', 'pending_4', 'correction', 'pending_review']);
       } else {
         query = query.where('status', isEqualTo: _selectedStatus);
       }

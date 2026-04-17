@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -303,6 +304,21 @@ class _MainLayoutState extends State<MainLayout> {
                            const SizedBox(width: 40),
                         ] else 
                            const Spacer(),
+                        // Audit Submission Rules (Manager Only)
+                        if (!isAuditor) ...[
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.rule_rounded, color: Color(0xFF1A1F36), size: 20),
+                              tooltip: 'Audit Submission Rules',
+                              onPressed: () => _showValidationRulesDialog(context),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                        ],
                         // Theme Toggle
                         Container(
                           decoration: BoxDecoration(
@@ -395,6 +411,100 @@ class _MainLayoutState extends State<MainLayout> {
     );
         },
     );
+  }
+
+  Future<void> _showValidationRulesDialog(BuildContext context) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('audit_configs').doc('submission_rules').get();
+      final Map<String, dynamic> currentRules = doc.exists ? doc.data() as Map<String, dynamic> : {};
+
+      if (!context.mounted) return;
+
+      unawaited(showDialog<void>(
+        context: context,
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setStateDialog) {
+              Widget buildRuleSwitch(String key, String title, String subtitle) {
+                return SwitchListTile(
+                  title: Text(title, style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14)),
+                  subtitle: Text(subtitle, style: GoogleFonts.outfit(fontSize: 12)),
+                  value: currentRules[key] as bool? ?? false,
+                  activeThumbColor: Colors.blue[700],
+                  onChanged: (val) {
+                    setStateDialog(() {
+                      currentRules[key] = val;
+                    });
+                  },
+                );
+              }
+
+              return AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                title: Row(
+                  children: [
+                    const Icon(Icons.gavel_rounded, color: Colors.blue),
+                    const SizedBox(width: 12),
+                    Text('Submission Validation Rules', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                content: SizedBox(
+                  width: 500,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                         buildRuleSwitch('mandatory_nc_category', 'NC Category', 'Require selection for Not OK tasks'),
+                         buildRuleSwitch('mandatory_action_plan', 'Action Plan Remark', 'Require remark for Not OK tasks'),
+                         buildRuleSwitch('mandatory_root_cause', 'Root Cause', 'Require root cause for Not OK tasks'),
+                         buildRuleSwitch('mandatory_plan_date', 'Plan Date (Target Date)', 'Require target date for Not OK tasks'),
+                         buildRuleSwitch('mandatory_pi_status', 'PI Status & Number', 'Require PI details for material related issues'),
+                         buildRuleSwitch('mandatory_observation', 'Observation/NC Summary', 'Require observation text for Not OK tasks'),
+                         buildRuleSwitch('mandatory_sub_status', 'Sub Status', 'Require sub-status selection (Aobs, MCF, CF)'),
+                         buildRuleSwitch('mandatory_reference', 'Reference', 'Require reference selection'),
+                         buildRuleSwitch('mandatory_photos', 'Photos', 'Require at least one photo per Not OK task'),
+                         const Divider(),
+                         buildRuleSwitch('force_date_takeover_less_than_plan', 'Take Over < Plan Date', 'Ensure Date of Take Over is before Plan Date of Maintenance'),
+                         buildRuleSwitch('force_date_actual_greater_than_takeover', 'Actual Date > Take Over', 'Ensure Actual Date of Maintenance is after Date of Take Over'),
+                      ],
+                    ),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('Cancel', style: GoogleFonts.outfit()),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      await FirebaseFirestore.instance.collection('audit_configs').doc('submission_rules').set(currentRules);
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Validation rules updated successfully', style: GoogleFonts.outfit()), backgroundColor: Colors.green),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A1F36),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text('Save Changes', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ));
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading rules: $e', style: GoogleFonts.outfit()), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Widget _buildNavItem(int index, IconData icon, String title) {

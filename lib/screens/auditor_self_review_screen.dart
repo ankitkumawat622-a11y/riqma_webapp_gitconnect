@@ -46,6 +46,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
   // Dynamic Config (fetched from Firestore)
   List<Map<String, dynamic>> _ncCategories = [];
   List<Map<String, dynamic>> _rootCauses = [];
+  Map<String, dynamic> _submissionRules = {};
 
   // Metadata Controllers
   final TextEditingController _wtgRatingController = TextEditingController();
@@ -506,11 +507,14 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
       final results = await Future.wait([
         FirebaseFirestore.instance.collection('audit_configs').doc('nc_categories').get(),
         FirebaseFirestore.instance.collection('audit_configs').doc('root_causes').get(),
+        FirebaseFirestore.instance.collection('audit_configs').doc('submission_rules').get(),
       ]);
       final ncSnap = results[0];
       final rcSnap = results[1];
+      final rulesSnap = results[2];
       if (mounted) {
         setState(() {
+          _submissionRules = rulesSnap.exists ? rulesSnap.data() as Map<String, dynamic> : {};
           _ncCategories = ncSnap.exists
               ? List<Map<String, dynamic>>.from(
                   (ncSnap.data()?['items'] as List<dynamic>? ?? [])
@@ -602,27 +606,23 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
   /// Validates all mandatory fields before submission
   /// Returns true if all validations pass, false otherwise
   bool _validateSubmission() {
-    // A. Global Metadata (Left Panel Checks)
+    // A. Metadata & Date Constraints
     
-    // Check WTG Rating
+    // Check Basic Info
     if (_wtgRatingController.text.trim().isEmpty) {
       _showValidationError('Please enter WTG Rating before submitting.');
       return false;
     }
-    
-    // Check Customer Name
     if (_customerNameController.text.trim().isEmpty) {
       _showValidationError('Please enter Customer Name before submitting.');
       return false;
     }
-
-    // Check Turbine Make
     if (_turbineMakeController.text.trim().isEmpty) {
       _showValidationError('Please enter Turbine Make before submitting.');
       return false;
     }
     
-    // Check Dates
+    // Check Global Dates Exist
     if (_commissioningDate == null) {
       _showValidationError('Please select Commissioning Date before submitting.');
       return false;
@@ -640,60 +640,135 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
       return false;
     }
 
+    // Dynamic Date Range Logic
+    if (_submissionRules['force_date_takeover_less_than_plan'] == true) {
+      if (_dateOfTakeOver!.isAfter(_planDateMaintenance!)) {
+        _showValidationError('Date of Take Over must be earlier than Plan Date of Maintenance.');
+        return false;
+      }
+    }
+    if (_submissionRules['force_date_actual_greater_than_takeover'] == true) {
+      if (_actualDateMaintenance!.isBefore(_dateOfTakeOver!)) {
+        _showValidationError('Actual Date of Maintenance must be later than Date of Take Over.');
+        return false;
+      }
+    }
+
     // B. Header/Global Settings (App Bar Checks)
-    
-    // Check PM Team
     final pmTeamLeader = localAuditData['pm_team_leader'];
     if (pmTeamLeader == null || (pmTeamLeader is String && pmTeamLeader.trim().isEmpty)) {
-      _showValidationError('Please add PM Team details from the top bar before submitting.');
+      _showValidationError('Please add PM Team details (Team Leader) from the top bar.');
       return false;
     }
     
-    // Check Maintenance Details
     if (_maintenanceType == null) {
-      _showValidationError('Please select Maintenance Type from the top bar before submitting.');
+      _showValidationError('Please select Maintenance Type from the top bar.');
       return false;
     }
     if (_assessmentStage == null) {
-      _showValidationError('Please select Assessment Stage from the top bar before submitting.');
+      _showValidationError('Please select Assessment Stage from the top bar.');
       return false;
     }
 
-    // C. Task-Level Validation (Check all 'Not OK' tasks)
+    // C. Task-Level Validation (Enforced for 'Not OK' tasks)
     final auditDataMap = localAuditData['audit_data'] as Map<String, dynamic>? ?? {};
     
     for (final entry in auditDataMap.entries) {
       final task = entry.value as Map<String, dynamic>;
       final status = task['status']?.toString().toLowerCase() ?? '';
       
-      // Only validate 'Not OK' tasks
       if (status == 'not ok') {
         final String? refId = task['reference_id']?.toString() ?? task['ref_id']?.toString();
         final referenceName = _refIdToName[refId] ?? 
                              task['reference_name'] ?? 
                              task['ref_name'] ?? 
-                             'Unknown Ref';
+                             'Task ${entry.key}';
         final question = task['question'] ?? task['task'] ?? 'Unknown Question';
-        
-        // Check NC Category (also check root_cause as fallback)
-        final ncCategory = task['nc_category'];
-        final rootCause = task['root_cause'];
-        if ((ncCategory == null || (ncCategory is String && ncCategory.trim().isEmpty)) &&
-            (rootCause == null || (rootCause is String && rootCause.trim().isEmpty))) {
-          _showValidationError('Please complete NC Classification for $referenceName - $question');
-          return false;
+        final errorPrefix = '$referenceName - $question';
+
+        // 1. NC Category
+        if (_submissionRules['mandatory_nc_category'] == true) {
+          final nc = task['nc_category']?.toString() ?? '';
+          if (nc.isEmpty) {
+            _showValidationError('NC Category is mandatory for: $errorPrefix');
+            return false;
+          }
         }
-        
-        // Check Action Plan
-        final actionPlan = task['action_plan'];
-        if (actionPlan == null || (actionPlan is String && actionPlan.trim().isEmpty)) {
-          _showValidationError('Please complete Action Plan for $referenceName - $question');
-          return false;
+
+        // 2. Action Plan Remark
+        if (_submissionRules['mandatory_action_plan'] == true) {
+          final ap = task['action_plan']?.toString() ?? '';
+          if (ap.isEmpty) {
+            _showValidationError('Action Plan Remark is mandatory for: $errorPrefix');
+            return false;
+          }
+        }
+
+        // 3. Root Cause
+        if (_submissionRules['mandatory_root_cause'] == true) {
+          final rc = task['root_cause']?.toString() ?? '';
+          if (rc.isEmpty) {
+            _showValidationError('Root Cause is mandatory for: $errorPrefix');
+            return false;
+          }
+        }
+
+        // 4. Plan Date (Target Date)
+        if (_submissionRules['mandatory_plan_date'] == true) {
+          final td = task['target_date'];
+          if (td == null) {
+            _showValidationError('Target Date (Plan Date) is mandatory for: $errorPrefix');
+            return false;
+          }
+        }
+
+        // 5. PI Status (Requires Status AND PI Number)
+        if (_submissionRules['mandatory_pi_status'] == true) {
+          final ms = task['material_status']?.toString() ?? '';
+          final pin = task['pi_number']?.toString() ?? '';
+          if (ms.isEmpty || pin.isEmpty) {
+             _showValidationError('Material Status and PI Number are both mandatory for: $errorPrefix');
+             return false;
+          }
+        }
+
+        // 6. Observation/NC Summary
+        if (_submissionRules['mandatory_observation'] == true) {
+          final obs = task['observation']?.toString() ?? '';
+          if (obs.trim().isEmpty) {
+            _showValidationError('Observation Remark (NC Summary) must not be blank for: $errorPrefix');
+            return false;
+          }
+        }
+
+        // 7. Sub Status
+        if (_submissionRules['mandatory_sub_status'] == true) {
+          final ss = task['sub_status']?.toString() ?? '';
+          if (ss.isEmpty) {
+            _showValidationError('Sub Status selection is mandatory for: $errorPrefix');
+            return false;
+          }
+        }
+
+        // 8. Reference
+        if (_submissionRules['mandatory_reference'] == true) {
+          if (refId == null || refId.isEmpty || refId == 'null') {
+            _showValidationError('Reference selection is mandatory for: $errorPrefix');
+            return false;
+          }
+        }
+
+        // 9. Photos (Minimum 1)
+        if (_submissionRules['mandatory_photos'] == true) {
+          final photosList = task['photos'] is List ? task['photos'] as List<dynamic> : <dynamic>[];
+          if (photosList.isEmpty) {
+            _showValidationError('At least one photo is mandatory for: $errorPrefix');
+            return false;
+          }
         }
       }
     }
 
-    // All validations passed
     return true;
   }
 
@@ -723,14 +798,21 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
       localAuditData['actual_date_of_maintenance'] = _actualDateMaintenance != null ? Timestamp.fromDate(_actualDateMaintenance!) : null;
 
       final currentStatus = widget.auditData['status'] as String?;
-      // Canonical status: 'correction' is the only correction state (correction_needed is retired)
-      final newStatus = currentStatus == 'correction' ? 'pending_2' : 'pending';
+      String newStatus = 'pending';
+      
+      if (currentStatus == 'correction') {
+        final remarks = widget.auditData['master_remarks'] as List? ?? [];
+        final managerRemarksCount = remarks.where((r) => (r as Map)['authorRole'] == 'manager').length;
+        // If it was sent back once (1 manager remark), next status is pending_2
+        // If sent back twice (2 manager remarks), next status is pending_3
+        newStatus = managerRemarksCount >= 1 ? 'pending_${managerRemarksCount + 1}' : 'pending_2';
+      }
 
       final user = FirebaseAuth.instance.currentUser;
       final newRemarkEntry = {
         'authorRole': 'auditor',
         'remark': remark,
-        'timestamp': FieldValue.serverTimestamp(),
+        'timestamp': Timestamp.now(),
         'authorName': user?.displayName ?? user?.email?.split('@')[0] ?? 'Auditor',
       };
 
@@ -2411,7 +2493,21 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
     final isOk = status == 'ok';
     
     final subStatus = item['sub_status'] ?? '';
-    final String? refId = item['reference_id']?.toString();
+    String? refId = item['reference_id']?.toString();
+    
+    // Auto-select reference by name if ID is missing
+    if (refId == null || refId.isEmpty || refId == 'null') {
+      final refName = (item['reference_name'] ?? item['referenceoftask'] ?? '').toString();
+      if (refName.isNotEmpty) {
+        final match = _allReferences.firstWhere(
+          (r) => r['name'].toString().toLowerCase() == refName.toLowerCase(),
+          orElse: () => {},
+        );
+        if (match.isNotEmpty) {
+          refId = match['id'].toString();
+        }
+      }
+    }
     // final String referenceName = (_refIdToName[refId] ?? item['reference_name'] ?? item['referenceoftask'] ?? '').toString(); // Unused
     final photosList = item['photos'] is List<dynamic> ? item['photos'] as List<dynamic> : <dynamic>[];
     final List<String> photos = photosList.whereType<String>().toList();
@@ -2445,17 +2541,20 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
           // Header
           Padding(
             padding: const EdgeInsets.all(12),
-            child: Row(
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 Text(
                   '# Audit Task ${index + 1}',
                   style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 if (item['is_corrected'] == true) ...[
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    margin: const EdgeInsets.only(right: 8),
                     decoration: BoxDecoration(
                       color: Colors.green[50],
                       borderRadius: BorderRadius.circular(4),
@@ -2471,7 +2570,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
                     ),
                   ),
                 ],
-                 // Status Toggle — always visible in header
+                 // Status Toggle
                  SegmentedButton<String>(
                    segments: const [
                      ButtonSegment(
@@ -2510,7 +2609,6 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
                      }),
                    ),
                  ),
-                 const SizedBox(width: 8),
                 if (!isOk) ...[
                   // Sub-Status Dropdown
                   ModernSearchableDropdown(
@@ -2528,9 +2626,8 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
                     },
                   ),
                   
-                  // Reference Selector (Modern Searchable Dropdown)
+                  // Reference Selector
                   if (!_isLoadingReferences) ...[
-                    const SizedBox(width: 12),
                     SizedBox(
                       width: 200,
                       child: ModernSearchableDropdown(

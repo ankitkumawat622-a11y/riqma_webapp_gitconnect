@@ -542,8 +542,20 @@ class _SubCategoriesViewState extends State<SubCategoriesView> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('main_categories').snapshots(),
-      builder: (context, mainCatSnapshot) {
+      stream: FirebaseFirestore.instance.collection('turbinemodel').snapshots(),
+      builder: (context, modelSnapshot) {
+        if (!modelSnapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+        final modelMap = {
+          for (var doc in modelSnapshot.data!.docs)
+            doc.id: (doc.data().containsKey('turbine_model') 
+                ? doc.data()['turbine_model'] 
+                : (doc.data().containsKey('name') ? doc.data()['name'] : 'Unknown')).toString()
+        };
+
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance.collection('main_categories').snapshots(),
+          builder: (context, mainCatSnapshot) {
         if (!mainCatSnapshot.hasData) return const Center(child: CircularProgressIndicator());
         
         final mainCatMap = {
@@ -682,17 +694,11 @@ class _SubCategoriesViewState extends State<SubCategoriesView> {
               children: [
                 // Model Filter
                 Expanded(
-                  child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: FirebaseFirestore.instance.collection('turbinemodel').snapshots(),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) return const SizedBox();
-                      final models = snapshot.data!.docs;
+                  child: Builder(
+                    builder: (context) {
                       final Map<String, String> items = {
                         'All': 'All Models',
-                        for (var doc in models)
-                          doc.id: (doc.data().containsKey('turbine_model') 
-                              ? doc.data()['turbine_model'] 
-                              : (doc.data().containsKey('name') ? doc.data()['name'] : 'Unknown')).toString()
+                        ...modelMap
                       };
 
                       return ModernSearchableDropdown(
@@ -777,7 +783,7 @@ class _SubCategoriesViewState extends State<SubCategoriesView> {
                       // Use _mainCatMap to resolve site names for display
                       String modelNamesDisplay = 'All Models';
                       if (subCat.targetModels.isNotEmpty) {
-                         modelNamesDisplay = subCat.targetModels.join(', ');
+                         modelNamesDisplay = subCat.targetModels.map((id) => modelMap[id] ?? id).join(', ');
                       }
 
                       return Padding(
@@ -807,10 +813,12 @@ class _SubCategoriesViewState extends State<SubCategoriesView> {
           ),
         ],
       ),
+            );
+          },
+        );
+      },
     );
   },
-);
-},
 );
 }
 }
