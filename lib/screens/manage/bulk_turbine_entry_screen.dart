@@ -6,10 +6,11 @@ import 'package:google_fonts/google_fonts.dart';
 
 // ─── Column width constants ────────────────────────────────────────────────────
 const double _kTColIndex = 40.0;
-const double _kTColName = 220.0;
-const double _kTColSite = 200.0;
-const double _kTColModel = 200.0;
-const double _kTColStatus = 120.0;
+const double _kTColName = 200.0;
+const double _kTColSite = 180.0;
+const double _kTColModel = 180.0;
+const double _kTColCategory = 140.0;
+const double _kTColStatus = 110.0;
 const double _kTColDelete = 44.0;
 const double kBulkTurbineRowHeight = 52.0;
 
@@ -23,6 +24,7 @@ class BulkTurbineRowData extends ChangeNotifier {
   String? modelId;
   String? modelName;
   DocumentReference? modelRef;
+  String wtgCategory;
 
   BulkTurbineRowData({
     this.turbineName = '',
@@ -32,6 +34,7 @@ class BulkTurbineRowData extends ChangeNotifier {
     this.modelId,
     this.modelName,
     this.modelRef,
+    this.wtgCategory = 'old',
   });
 
   bool get isValid =>
@@ -78,6 +81,11 @@ class BulkTurbineRowData extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setWTGCategory(String v) {
+    wtgCategory = v;
+    notifyListeners();
+  }
+
   Map<String, dynamic> toFirestore() => {
         'turbine_name': turbineName.trim(),
         'name': turbineName.trim(),
@@ -85,6 +93,7 @@ class BulkTurbineRowData extends ChangeNotifier {
         'site_name': siteName ?? '',
         'turbinemodel_ref': modelRef,
         'model_name': modelName ?? '',
+        'wtg_category': wtgCategory,
         'created_at': FieldValue.serverTimestamp(),
         'bulk_entry': true,
       };
@@ -126,6 +135,14 @@ class _BulkTurbineController extends ChangeNotifier {
     rows[index].removeListener(_onRowChanged);
     rows[index].dispose();
     rows.removeAt(index);
+    _revalidate();
+    notifyListeners();
+  }
+
+  void reorderRows(int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex--;
+    final row = rows.removeAt(oldIndex);
+    rows.insert(newIndex, row);
     _revalidate();
     notifyListeners();
   }
@@ -253,6 +270,14 @@ class _BulkTurbineController extends ChangeNotifier {
           row.modelId = match['id'] as String?;
           row.modelName = match['name'] as String?;
           row.modelRef = match['ref'] as DocumentReference?;
+        }
+      }
+
+      // Col 3 → WTG Category (new/old)
+      if (cols.length > 3 && cols[3].trim().isNotEmpty) {
+        final cat = cols[3].trim().toLowerCase();
+        if (cat == 'new' || cat == 'old') {
+          row.wtgCategory = cat;
         }
       }
 
@@ -735,7 +760,7 @@ class _BulkTurbineEntryScreenState extends State<BulkTurbineEntryScreen> {
               ),
               const SizedBox(width: 10),
               Text(
-                'Excel column order:  Turbine Name  |  Site Name  |  Model Name',
+                'Excel column order:  Turbine Name  |  Site Name  |  Model Name  |  WTG Category (new/old)',
                 style: GoogleFonts.outfit(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -800,6 +825,8 @@ class _BulkTurbineEntryScreenState extends State<BulkTurbineEntryScreen> {
             const SizedBox(width: 8),
             header('Model', _kTColModel, required: true),
             const SizedBox(width: 8),
+            header('Category', _kTColCategory, required: true),
+            const SizedBox(width: 8),
             header('Status', _kTColStatus),
             const SizedBox(width: _kTColDelete),
           ],
@@ -824,29 +851,46 @@ class _BulkTurbineEntryScreenState extends State<BulkTurbineEntryScreen> {
 
     return Scrollbar(
       controller: _vScroll,
-      child: SingleChildScrollView(
-        controller: _vScroll,
-        child: ListenableBuilder(
-          listenable: _controller,
-          builder: (context2, _) {
-            return Column(
-              children: [
-                for (int i = 0; i < _controller.rows.length; i++)
-                  _BulkTurbineRow(
-                    key: ValueKey(i),
-                    rowIndex: i,
-                    row: _controller.rows[i],
-                    controller: _controller,
-                    siteMap: _siteMap,
-                    siteByName: _siteByName,
-                    modelMap: _modelMap,
-                    modelByName: _modelByName,
-                    hScrollController: _hScroll,
-                  ),
-                // Bottom add affordance
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      child: ListenableBuilder(
+        listenable: _controller,
+        builder: (context2, _) {
+          return ReorderableListView.builder(
+            scrollController: _vScroll,
+            itemCount: _controller.rows.length + 1,
+            onReorder: (oldIndex, newIndex) {
+              if (oldIndex < _controller.rows.length && newIndex <= _controller.rows.length) {
+                _controller.reorderRows(oldIndex, newIndex);
+              }
+            },
+            proxyDecorator: (child, index, animation) {
+              return Material(
+                elevation: 4,
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                child: child,
+              );
+            },
+            itemBuilder: (context, i) {
+              if (i < _controller.rows.length) {
+                return _BulkTurbineRow(
+                  key: ValueKey(_controller.rows[i]), // Use the row object as key for stable reordering
+                  rowIndex: i,
+                  row: _controller.rows[i],
+                  controller: _controller,
+                  siteMap: _siteMap,
+                  siteByName: _siteByName,
+                  modelMap: _modelMap,
+                  modelByName: _modelByName,
+                  hScrollController: _hScroll,
+                );
+              }
+              // Bottom add affordance (as a list item that isn't reorderable)
+              return ReorderableDelayedDragStartListener(
+                key: const ValueKey('add_affordance'),
+                index: i,
+                enabled: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
                   child: InkWell(
                     onTap: _controller.addRow,
                     borderRadius: BorderRadius.circular(8),
@@ -860,21 +904,18 @@ class _BulkTurbineEntryScreenState extends State<BulkTurbineEntryScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.add_rounded,
-                              color: Colors.grey.shade500, size: 18),
+                          Icon(Icons.add_rounded, color: Colors.grey.shade500, size: 18),
                           const SizedBox(width: 6),
-                          Text('Add Row',
-                              style: GoogleFonts.outfit(
-                                  color: Colors.grey.shade500, fontSize: 13)),
+                          Text('Add Row', style: GoogleFonts.outfit(color: Colors.grey.shade500, fontSize: 13)),
                         ],
                       ),
                     ),
                   ),
                 ),
-              ],
-            );
-          },
-        ),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -940,15 +981,25 @@ class _BulkTurbineRow extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Index
+                      // Index + Drag Handle
                       SizedBox(
                         width: _kTColIndex,
-                        child: Center(
-                          child: Text('${rowIndex + 1}',
-                              style: GoogleFonts.outfit(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade400,
-                                  fontWeight: FontWeight.w500)),
+                        child: Row(
+                          children: [
+                            ReorderableDragStartListener(
+                              index: rowIndex,
+                              child: Icon(Icons.drag_indicator_rounded, size: 16, color: Colors.grey.shade400),
+                            ),
+                            Expanded(
+                              child: Center(
+                                child: Text('${rowIndex + 1}',
+                                    style: GoogleFonts.outfit(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade400,
+                                        fontWeight: FontWeight.w500)),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 
@@ -1016,6 +1067,38 @@ class _BulkTurbineRow extends StatelessWidget {
                             }
                           },
                           onCleared: row.clearModel,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // WTG Category
+                      SizedBox(
+                        width: _kTColCategory,
+                        child: Container(
+                          height: 36,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _TCategoryOption(
+                                label: 'OLD',
+                                isSelected: row.wtgCategory == 'old',
+                                onTap: () => row.setWTGCategory('old'),
+                                color: Colors.grey,
+                              ),
+                              _TCategoryOption(
+                                label: 'NEW',
+                                isSelected: row.wtgCategory == 'new',
+                                onTap: () => row.setWTGCategory('new'),
+                                color: Colors.orange,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -1380,6 +1463,50 @@ class _TLegendDot extends StatelessWidget {
             style: GoogleFonts.outfit(
                 fontSize: 11, color: Colors.grey.shade600)),
       ],
+    );
+  }
+}
+
+class _TCategoryOption extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final Color color;
+
+  const _TCategoryOption({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withValues(alpha: 0.1) : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: isSelected ? color : Colors.transparent,
+              width: 1,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: GoogleFonts.outfit(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? color : Colors.grey.shade400,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

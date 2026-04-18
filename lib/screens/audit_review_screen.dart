@@ -6,7 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:riqma_webapp/screens/audit/audit_summary_report_screen.dart';
 import 'package:riqma_webapp/services/activity_log_service.dart';
+import 'package:riqma_webapp/services/mis_service.dart';
+import 'package:riqma_webapp/services/toast_service.dart';
 import 'package:riqma_webapp/widgets/modern_searchable_dropdown.dart';
 
 class AuditReviewScreen extends StatefulWidget {
@@ -31,7 +34,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
 
   // Selection & Filter Tracking
   int _selectedTaskIndex = 0;
-  String _filterStatus = 'all'; // 'all' | 'OK' | 'Not OK'
+  String _filterStatus = 'Not OK'; // 'all' | 'OK' | 'Not OK'
   List<AuditGroup> _processedGroups = []; // State for hierarchical data
   final Set<String> _collapsedCategories = {}; // tracks which main-cats are collapsed
   bool _isMetadataExpanded = true; // State for collapsible metadata
@@ -50,7 +53,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
   // Fetched Data
   String _fetchedMake = '';
   String _fetchedRating = '';
-  bool _isLoadingDetails = false;
+
   DateTime? _commissioningDate;
   DateTime? _dateOfTakeOver;
   DateTime? _planDateMaintenance;
@@ -151,7 +154,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
       return a.key.compareTo(b.key);
     });
 
-    Map<String, AuditGroup> groups = {};
+    final Map<String, AuditGroup> groups = {};
 
     for (int i = 0; i < entries.length; i++) {
         final entry = entries[i];
@@ -160,7 +163,8 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
         final mainCat = task['main_category_name']?.toString() ?? 'Other';
         final subCat = task['sub_category_name']?.toString() ?? 'General';
         final status = task['status']?.toString();
-        final isOk = status == 'OK';
+        final isCorrected = task['is_corrected'] == true;
+        final isOk = status == 'OK' && !isCorrected;
 
         // Get or Create Main Group
         if (!groups.containsKey(mainCat)) {
@@ -185,7 +189,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
 
         // Add Task
         // Store original index to allow selection
-        Map<String, dynamic> taskData = Map.from(task);
+        final Map<String, dynamic> taskData = Map.from(task);
         taskData['original_index'] = i; 
         taskData['key'] = entry.key;
         subGroup.tasks.add(taskData);
@@ -223,6 +227,35 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
     }
   }
 
+  Widget _buildStatusToggleButton({
+    required String label,
+    required bool isSelected,
+    required MaterialColor activeColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor.withValues(alpha: 0.1) : Colors.transparent,
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.outfit(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              color: isSelected ? activeColor.shade700 : Colors.grey.shade600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showAutomaticRemarkPopupIfNeeded() {
     if (_hasShownAutoRemarkPopup) return;
 
@@ -245,44 +278,101 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
   void _showRemarkPopup(Map<String, dynamic> remarkData) {
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.feedback_rounded, color: Colors.blue),
-            const SizedBox(width: 8),
-            Text('Auditor Message', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Sent by ${remarkData['authorName']} (${DateFormat('dd/MM/yyyy HH:mm').format((remarkData['timestamp'] as Timestamp).toDate())})',
-              style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue[100]!),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: 450,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
               ),
-              child: Text(
-                remarkData['remark'].toString(),
-                style: GoogleFonts.outfit(fontSize: 14),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+            ],
           ),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.mark_chat_unread_rounded, color: Colors.blue.shade700, size: 32),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Auditor Message',
+                style: GoogleFonts.outfit(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF1A1F36),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.person, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    widget.auditData['auditor_name']?.toString() ?? remarkData['authorName'].toString(),
+                    style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[800]),
+                  ),
+                  const SizedBox(width: 12),
+                  Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    DateFormat('dd/MM/yyyy HH:mm').format((remarkData['timestamp'] as Timestamp).toDate()),
+                    style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Text(
+                  remarkData['remark'].toString(),
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.outfit(
+                    fontSize: 15,
+                    color: Colors.grey[800],
+                    height: 1.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1A1F36),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    'Understood',
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -290,62 +380,149 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
   void _showMasterRemarkHistory() {
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.history_edu, color: Color(0xFF0D7377)),
-            const SizedBox(width: 8),
-            Text('Master Remark History', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: SizedBox(
-          width: 500,
-          height: 400,
-          child: _masterRemarks.isEmpty
-              ? Center(child: Text('No remarks recorded yet.', style: GoogleFonts.outfit()))
-              : ListView.separated(
-                  itemCount: _masterRemarks.length,
-                  separatorBuilder: (context, index) => const Divider(),
-                  itemBuilder: (context, index) {
-                    final remark = _masterRemarks[(_masterRemarks.length - 1) - index]; // Show latest first
-                    final isManager = remark['authorRole'] == 'manager';
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                '${remark['authorName']} (${remark['authorRole'].toString().toUpperCase()})',
-                                style: GoogleFonts.outfit(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                  color: isManager ? Colors.blue[700] : Colors.orange[700],
-                                ),
-                              ),
-                              Text(
-                                DateFormat('dd/MM/yyyy HH:mm').format((remark['timestamp'] as Timestamp).toDate()),
-                                style: GoogleFonts.outfit(fontSize: 10, color: Colors.grey),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(remark['remark'].toString(), style: GoogleFonts.outfit(fontSize: 13)),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close', style: GoogleFonts.outfit()),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: 550,
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
           ),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.history_edu_rounded, color: Colors.teal.shade700, size: 24),
+                  ),
+                  const SizedBox(width: 16),
+                  Text(
+                    'Remark History',
+                    style: GoogleFonts.outfit(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF1A1F36),
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                    style: IconButton.styleFrom(backgroundColor: Colors.grey.shade100),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Expanded(
+                child: _masterRemarks.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.notes_rounded, size: 48, color: Colors.grey[300]),
+                            const SizedBox(height: 12),
+                            Text('No remarks yet', style: GoogleFonts.outfit(color: Colors.grey[500])),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _masterRemarks.length,
+                        itemBuilder: (context, index) {
+                          final remark = _masterRemarks[(_masterRemarks.length - 1) - index];
+                          final isManager = remark['authorRole'] == 'manager';
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 20.0),
+                            child: IntrinsicHeight(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Column(
+                                    children: [
+                                      Container(
+                                        width: 12,
+                                        height: 12,
+                                        decoration: BoxDecoration(
+                                          color: isManager ? Colors.blue.shade400 : Colors.orange.shade400,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.white, width: 2),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: (isManager ? Colors.blue : Colors.orange).withValues(alpha: 0.3),
+                                              blurRadius: 4,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Container(
+                                          width: 2,
+                                          color: Colors.grey.shade200,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: isManager ? Colors.blue.shade50.withValues(alpha: 0.5) : Colors.orange.shade50.withValues(alpha: 0.5),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: isManager ? Colors.blue.shade100 : Colors.orange.shade100,
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                           Row(
+                                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                             children: [
+                                               Text(
+                                                 (isManager ? 'Manager' : (widget.auditData['auditor_name']?.toString() ?? remark['authorName'].toString())),
+                                                 style: GoogleFonts.outfit(
+                                                   fontWeight: FontWeight.bold,
+                                                   fontSize: 13,
+                                                   color: isManager ? Colors.blue.shade900 : Colors.orange.shade900,
+                                                 ),
+                                               ),
+                                               Text(
+                                                 DateFormat('dd/MM/yyyy HH:mm').format((remark['timestamp'] as Timestamp).toDate()),
+                                                 style: GoogleFonts.outfit(fontSize: 11, color: Colors.grey[500]),
+                                               ),
+                                             ],
+                                           ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            remark['remark'].toString(),
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 14,
+                                              color: Colors.grey[800],
+                                              height: 1.4,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -380,7 +557,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
       if (mounted) {
         setState(() {
           // Process References for fallback
-          for (var doc in refSnap.docs) {
+          for (final doc in refSnap.docs) {
              _refIdToName[doc.id] = doc.data()['name']?.toString() ?? 'Unknown';
           }
 
@@ -409,7 +586,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
           .get();
           
       final Map<String, String> taskToNC = {};
-      for (var doc in ncsSnapshot.docs) {
+      for (final doc in ncsSnapshot.docs) {
         final taskKey = doc.data()['task_key']?.toString();
         if (taskKey != null) {
           taskToNC[taskKey] = doc.id;
@@ -442,10 +619,9 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
     }
 
     if (modelId != null && modelId.isNotEmpty) {
-      if (mounted) setState(() => _isLoadingDetails = true);
       
       try {
-        var doc = await FirebaseFirestore.instance
+        final doc = await FirebaseFirestore.instance
             .collection('turbinemodel')
             .doc(modelId)
             .get();
@@ -468,9 +644,8 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
           });
         }
       } catch (e) {
-        debugPrint("Error fetching model details: $e");
+        debugPrint('Error fetching model details: $e');
       } finally {
-        if (mounted) setState(() => _isLoadingDetails = false);
       }
     }
   }
@@ -559,6 +734,12 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
           'pm_team_leader': _pmTeamLeader,
           'pm_team_members': _pmTeamMembers,
         });
+
+        // Trigger Automated MIS Sync (Flattened data for analysis & cross-platform tracking)
+        if (newStatus == 'approved') {
+          // Pass the updated localAuditData to ensure MIS has the latest values
+          unawaited(MISService().syncAuditToMIS(widget.auditId, localAuditData));
+        }
       }
 
       // Log Action
@@ -583,15 +764,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
       }
       Navigator.of(context).pop();
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            newStatus == 'approved' ? 'Audit Approved Successfully' : 'Sent for Correction',
-            style: GoogleFonts.outfit(),
-          ),
-          backgroundColor: newStatus == 'approved' ? Colors.green : Colors.red,
-        ),
-      );
+      ToastService.success(newStatus == 'approved' ? 'Audit Approved Successfully' : 'Sent for Correction');
       Navigator.of(context).pop(); // Go back to dashboard
     } catch (e) {
       // Log Failure
@@ -609,10 +782,34 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
         return;
       }
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating audit: $e', style: GoogleFonts.outfit()), backgroundColor: Colors.red),
-      );
+      ToastService.error('Error updating audit: $e');
     }
+  }
+
+  void _navigateToSummary() {
+    // 1. Prepare Master Data Map for the summary screen
+    final Map<String, String> masterDataMap = {
+      'turbine_make': _turbineMakeController.text,
+      'turbine_model': _wtgModelController.text,
+      'turbine_rating': _wtgRatingController.text,
+      'district': (localAuditData['district'] ?? '').toString(),
+      'warehouse_code': (localAuditData['warehouse_code'] ?? '').toString(),
+      'zone': (localAuditData['zone'] ?? '').toString(),
+    };
+
+    // 2. Add any missing site/state info if not in localAuditData
+    // (Usually fetched during initState or _fetchModelDetails)
+
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (context) => AuditSummaryReportScreen(
+          auditId: widget.auditId,
+          auditData: localAuditData,
+          masterData: masterDataMap,
+        ),
+      ),
+    );
   }
 
   Future<String?> _showRejectionRemarkDialog() async {
@@ -685,15 +882,11 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
         });
         
         if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Changes saved', style: GoogleFonts.outfit()), backgroundColor: Colors.green),
-            );
+            ToastService.success('Changes saved');
         }
     } catch (e) {
         if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error saving: $e', style: GoogleFonts.outfit()), backgroundColor: Colors.red),
-            );
+            ToastService.error('Error saving: $e');
         }
     }
   }
@@ -799,61 +992,11 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Type Of Maintenance', style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14)),
-                        const SizedBox(height: 8),
-                        Container(
-                          decoration: BoxDecoration(border: Border.all(color: Colors.grey[300]!), borderRadius: BorderRadius.circular(8)),
-                          child: RadioGroup<String>(
-                            groupValue: tempTypeId,
-                            onChanged: (val) {
-                              setDialogState(() {
-                                tempTypeId = val;
-                                final found = typesRaw.firstWhere(
-                                    (t) => (t as Map)['id'] == val,
-                                    orElse: () => <String, dynamic>{'label': val});
-                                tempTypeLabel = (found as Map)['label']?.toString();
-                              });
-                            },
-                            child: Column(
-                              children: typesRaw.map((option) {
-                                final o = option as Map;
-                                return RadioListTile<String>(
-                                  title: Text(o['label'].toString(), style: GoogleFonts.outfit(fontSize: 13)),
-                                  value: o['id'].toString(),
-                                  dense: true,
-                                  activeColor: Colors.orange[700],
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Text('Assessment Work Details', style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14)),
-                        const SizedBox(height: 8),
-                        ModernSearchableDropdown(
-                          label: 'Assessment Work Details',
-                          value: tempStageId,
-                          items: {
-                            for (var s in stagesRaw) s['id'].toString(): s['label'].toString()
-                          },
-                          color: Colors.blue,
-                          icon: Icons.checklist_rtl_rounded,
-                          onChanged: (val) {
-                             setDialogState(() {
-                                tempStageId = val;
-                                final found = stagesRaw.firstWhere(
-                                    (s) => (s as Map)['id'] == val,
-                                    orElse: () => <String, dynamic>{'label': val});
-                                tempStageLabel = (found as Map)['label']?.toString();
-                              });
-                          },
-                        ),
-                        const SizedBox(height: 20),
                         ModernSearchableDropdown(
                           label: 'Type Of Maintenance',
                           value: tempTypeId,
                           items: {
-                            for (var t in typesRaw) t['id'].toString(): t['label'].toString()
+                            for (final t in typesRaw) t['id'].toString(): t['label'].toString()
                           },
                           color: Colors.indigo,
                           icon: Icons.precision_manufacturing_rounded,
@@ -867,6 +1010,28 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
                               });
                           },
                         ),
+                        const SizedBox(height: 20),
+                        Text('Assessment Work Details', style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14)),
+                        const SizedBox(height: 8),
+                        ModernSearchableDropdown(
+                          label: 'Assessment Work Details',
+                          value: tempStageId,
+                          items: {
+                            for (final s in stagesRaw) s['id'].toString(): s['label'].toString()
+                          },
+                          color: Colors.blue,
+                          icon: Icons.checklist_rtl_rounded,
+                          onChanged: (val) {
+                             setDialogState(() {
+                                tempStageId = val;
+                                final found = stagesRaw.firstWhere(
+                                    (s) => (s as Map)['id'] == val,
+                                    orElse: () => <String, dynamic>{'label': val});
+                                tempStageLabel = (found as Map)['label']?.toString();
+                              });
+                          },
+                        ),
+
                       ],
                     ),
                   ),
@@ -1030,7 +1195,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
                   label: 'NC Category',
                   value: selectedCategory,
                   items: {
-                    for (var cat in _ncCategories) cat['name']?.toString() ?? '': cat['name']?.toString() ?? ''
+                    for (final cat in _ncCategories) cat['name']?.toString() ?? '': cat['name']?.toString() ?? ''
                   },
                   color: Colors.purple,
                   icon: Icons.category_outlined,
@@ -1116,7 +1281,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
                         : ModernSearchableDropdown(
                       label: 'Root Cause',
                       value: rootCauseItems.contains(selectedRootCause) ? selectedRootCause : null,
-                      items: {for (var rc in rootCauseItems) rc: rc},
+                      items: {for (final rc in rootCauseItems) rc: rc},
                       color: Colors.amber,
                       icon: Icons.psychology_rounded,
                       onChanged: (val) => setDialogState(() => selectedRootCause = val),
@@ -1429,6 +1594,25 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
                   ),
                 ),
               ),
+              const SizedBox(width: 4),
+              // Summary Preview Button
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Tooltip(
+                  message: 'View Audit Summary',
+                  child: ElevatedButton.icon(
+                    onPressed: _navigateToSummary,
+                    icon: const Icon(Icons.analytics_outlined, size: 16),
+                    label: Text('Summary', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.indigo[600],
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ),
               const SizedBox(width: 8),
               // Correction Button
               Padding(
@@ -1553,163 +1737,204 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
   }
 
   Widget _buildMetadataSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Collapsible Header
-        InkWell(
-          onTap: () => setState(() => _isMetadataExpanded = !_isMetadataExpanded),
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 4,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0D7377),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Turbine Details',
-                      style: GoogleFonts.outfit(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF0D7377),
-                      ),
-                    ),
-                  ],
-                ),
-                AnimatedRotation(
-                  turns: _isMetadataExpanded ? 0.0 : -0.25,
-                  duration: const Duration(milliseconds: 200),
-                  child: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF0D7377)),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        
-        // Collapsible Content
-        AnimatedCrossFade(
-          firstChild: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2, 
-                    child: Stack(
-                      children: [
-                        _buildTextField('Turbine Make', _turbineMakeController, readOnly: true),
-                         if (_isLoadingDetails)
-                          const Positioned(
-                            bottom: 2, left: 2, right: 2,
-                            child: LinearProgressIndicator(minHeight: 2),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(flex: 2, child: _buildTextField('WTG Model', _wtgModelController, readOnly: true)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 1, 
-                    child: Stack(
-                      children: [
-                        _buildTextField('WTG Rating', _wtgRatingController, readOnly: true),
-                        if (_isLoadingDetails)
-                          const Positioned(
-                            bottom: 2, left: 2, right: 2,
-                            child: LinearProgressIndicator(minHeight: 2),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(child: _buildDatePicker('Commissioning Date', _commissioningDate)),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildDatePicker('Date of Take Over', _dateOfTakeOver)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(child: _buildDatePicker('Plan Date of Maintenance', _planDateMaintenance)),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildDatePicker('Actual Date of Maintenance', _actualDateMaintenance)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _buildTextField('Customer Name', _customerNameController, readOnly: true),
-            ],
-          ),
-          secondChild: const SizedBox.shrink(),
-          crossFadeState: _isMetadataExpanded ? CrossFadeState.showFirst : CrossFadeState.showSecond,
-          duration: const Duration(milliseconds: 300),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTextField(String label, TextEditingController controller, {bool readOnly = true}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: readOnly ? Colors.grey[200] : const Color(0xFFE0F2F1),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFF80CBC4)),
-          ),
-          child: TextField(
-            controller: controller,
-            readOnly: readOnly,
-            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w500, color: readOnly ? Colors.grey[700] : Colors.black87),
-            decoration: InputDecoration(
-              labelText: label,
-              labelStyle: GoogleFonts.outfit(color: Colors.black54, fontSize: 13),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDatePicker(String label, DateTime? date) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[400]!),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.teal.shade100, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.teal.shade900.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: GoogleFonts.outfit(fontSize: 11, color: Colors.black87, fontWeight: FontWeight.w600)),
+          Row(
+            children: [
+              Icon(Icons.precision_manufacturing_rounded, color: Colors.teal.shade700, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Basic Information',
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.teal.shade900,
+                ),
+              ),
+              const Spacer(),
+              InkWell(
+                onTap: () => setState(() => _isMetadataExpanded = !_isMetadataExpanded),
+                child: AnimatedRotation(
+                  turns: _isMetadataExpanded ? 0.0 : -0.25,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.teal.shade700),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          AnimatedCrossFade(
+            firstChild: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: _buildMetadataItem('Turbine Make', _turbineMakeController.text, Icons.factory_rounded)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildMetadataItem('WTG Model', _wtgModelController.text, Icons.model_training_rounded)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(child: _buildMetadataItem('WTG Rating', _wtgRatingController.text, Icons.bolt_rounded)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildMetadataItem('Customer', _customerNameController.text, Icons.business_rounded)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ModernSearchableDropdown(
+                        label: 'Assessment Stage',
+                        value: _assessmentStage,
+                        items: const {
+                          'Commissioning': 'Commissioning',
+                          'Maintenance': 'Maintenance',
+                          'Major Component': 'Major Component',
+                          'RWP': 'RWP',
+                        },
+                        color: Colors.teal,
+                        icon: Icons.assignment_turned_in_rounded,
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _assessmentStage = val;
+                              localAuditData['assessment_stage'] = val;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ModernSearchableDropdown(
+                        label: 'Maintenance Type',
+                        value: _maintenanceType,
+                        items: const {
+                          '500 Hr': '500 Hr',
+                          'H-Yearly': 'H-Yearly',
+                          'Yearly': 'Yearly',
+                          '2-Yearly': '2-Yearly',
+                          '3-Yearly': '3-Yearly',
+                          '4-Yearly': '4-Yearly',
+                          '5-Yearly': '5-Yearly',
+                        },
+                        color: Colors.teal,
+                        icon: Icons.settings_suggest_rounded,
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _maintenanceType = val;
+                              localAuditData['maintenance_type'] = val;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(child: _buildDateItem('Commissioning', _commissioningDate)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildDateItem('Take Over', _dateOfTakeOver)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(child: _buildDateItem('Plan Maintenance', _planDateMaintenance)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildDateItem('Actual Maintenance', _actualDateMaintenance)),
+                  ],
+                ),
+              ],
+            ),
+            secondChild: const SizedBox.shrink(),
+            crossFadeState: _isMetadataExpanded ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+            duration: const Duration(milliseconds: 300),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetadataItem(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.teal.shade50),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 12, color: Colors.teal.shade300),
+              const SizedBox(width: 4),
+              Text(label, style: GoogleFonts.outfit(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value.isEmpty ? '---' : value,
+            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateItem(String label, DateTime? date) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.teal.shade50.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.teal.shade100.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: GoogleFonts.outfit(fontSize: 10, color: Colors.teal.shade700, fontWeight: FontWeight.w600)),
           const SizedBox(height: 2),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Icon(Icons.calendar_today_rounded, size: 12, color: Colors.teal.shade400),
+              const SizedBox(width: 6),
               Text(
-                date != null ? DateFormat('dd/MM/yyyy').format(date) : 'calendar',
-                style: GoogleFonts.outfit(fontSize: 13, color: date != null ? Colors.grey[700] : Colors.grey[400]),
+                date != null ? DateFormat('dd MMM yyyy').format(date) : 'Not Set',
+                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.teal.shade900),
               ),
-              Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
             ],
           ),
         ],
@@ -1717,12 +1942,14 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
     );
   }
 
+
   Widget _buildStatsSection(List<MapEntry<String, dynamic>> tasks) {
     int okCount = 0;
     int notOkCount = 0;
-    for (var entry in tasks) {
+    for (final entry in tasks) {
       final status = entry.value['status']?.toString().toLowerCase() ?? '';
-      if (status == 'ok') {
+      final isCorrected = entry.value['is_corrected'] == true;
+      if (status == 'ok' && !isCorrected) {
         okCount++;
       } else {
         notOkCount++;
@@ -1739,13 +1966,13 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
           borderRadius: BorderRadius.circular(12),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: isActive ? countColor.withValues(alpha: 0.12) : Colors.purple.shade50,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: isActive ? countColor : Colors.transparent,
-                width: 2,
+                width: 1.5,
               ),
             ),
             child: Row(
@@ -1754,17 +1981,17 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: GoogleFonts.outfit(color: Colors.black87, fontSize: 14)),
+                    Text(label, style: GoogleFonts.outfit(color: Colors.black87, fontSize: 12)),
                     if (isActive)
-                      Text('Filtering', style: GoogleFonts.outfit(fontSize: 10, color: countColor, fontWeight: FontWeight.w600)),
+                      Text('Filtering', style: GoogleFonts.outfit(fontSize: 9, color: countColor, fontWeight: FontWeight.w600)),
                   ],
                 ),
                 Row(
                   children: [
-                    Text('$count', style: GoogleFonts.outfit(color: countColor, fontSize: 24, fontWeight: FontWeight.bold)),
+                    Text('$count', style: GoogleFonts.outfit(color: countColor, fontSize: 19, fontWeight: FontWeight.bold)),
                     if (isActive) ...[
-                      const SizedBox(width: 6),
-                      Icon(Icons.close, size: 14, color: countColor),
+                      const SizedBox(width: 4),
+                      Icon(Icons.close, size: 12, color: countColor),
                     ],
                   ],
                 ),
@@ -1800,7 +2027,13 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
             final newMain = AuditGroup(mainGroup.title);
             mainGroup.subGroups.forEach((k, subGroup) {
               final filteredTasks = subGroup.tasks
-                  .where((t) => (t['status']?.toString().toLowerCase() ?? '') == filterLower)
+                  .where((t) {
+                    final s = t['status']?.toString().toLowerCase() ?? '';
+                    final ic = t['is_corrected'] == true;
+                    if (filterLower == 'ok') return s == 'ok' && !ic;
+                    if (filterLower == 'not ok') return s != 'ok' || ic;
+                    return s == filterLower;
+                  })
                   .toList();
               if (filteredTasks.isNotEmpty) {
                 final newSub = AuditGroup(subGroup.title)
@@ -1816,7 +2049,11 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
 
     for (final mainGroup in displayGroups) {
       final allTasks = mainGroup.subGroups.values.expand((sg) => sg.tasks).toList();
-      final okCount = allTasks.where((t) => (t['status']?.toString().toLowerCase() ?? '') == 'ok').length;
+      final okCount = allTasks.where((t) {
+        final s = t['status']?.toString().toLowerCase() ?? '';
+        final ic = t['is_corrected'] == true;
+        return s == 'ok' && !ic;
+      }).length;
       final notOkCount = allTasks.length - okCount;
 
       items.add(_FlatCategoryHeader(
@@ -1926,7 +2163,8 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
 
   /// High-density task row — 4px NC strip, color-coded bg, truncated observation.
   Widget _buildFlatTaskItem(Map<String, dynamic> task) {
-    final isOk = (task['status']?.toString().toLowerCase() ?? '') == 'ok';
+    final isCorrected = task['is_corrected'] == true;
+    final isOk = (task['status']?.toString().toLowerCase() ?? '') == 'ok' && !isCorrected;
     final originalIndex = task['original_index'] as int;
     final isSelected = originalIndex == _selectedTaskIndex;
     final question = task['question']?.toString() ?? 'No Question';
@@ -2040,7 +2278,6 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
     final String? refId = item['reference_id']?.toString();
     final referenceName = _refIdToName[refId] ?? item['reference_name'] ?? item['referenceoftask'] ?? '';
     final observation = item['observation'] ?? '';
-    final remark = item['remarks'] ?? item['remark'] ?? '';
     
     final photosList = item['photos'] is List ? item['photos'] as List : <dynamic>[];
     final List<String> photos = photosList.map((e) => e.toString()).toList();
@@ -2073,151 +2310,177 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
         children: [
           // Header
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
-                Text(
-                  '# Audit Task ${index + 1}',
-                  style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1F36).withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '#${index + 1}',
+                    style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF1A1F36)),
+                  ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 12),
                 if (item['is_corrected'] == true) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                     decoration: BoxDecoration(
-                      color: Colors.green[50],
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.green[200]!),
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.green.shade100),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.check_circle, size: 14, color: Colors.green),
+                        Icon(Icons.auto_fix_high_rounded, size: 14, color: Colors.green.shade700),
                         const SizedBox(width: 4),
-                        Text('Corrected On-Site', style: GoogleFonts.outfit(fontSize: 12, color: Colors.green[800], fontWeight: FontWeight.w600)),
+                        Text('OSC', style: GoogleFonts.outfit(fontSize: 11, color: Colors.green.shade800, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
                 ],
-                // Status Toggle (editable only when not read-only)
-                if (!widget.isReadOnly) ...[ 
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(
-                        value: 'OK',
-                        label: Text('OK', style: TextStyle(fontSize: 12)),
-                        icon: Icon(Icons.check_circle_outline, size: 15),
+                const Spacer(),
+                // Unified Control Group
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Status Toggle
+                    if (!widget.isReadOnly) 
+                      Container(
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            _buildStatusToggleButton(
+                              label: 'OK', 
+                              isSelected: status == 'ok', 
+                              activeColor: Colors.green,
+                              onTap: () {
+                                setState(() => localAuditData['audit_data'][taskKey]['status'] = 'OK');
+                                _processAuditData();
+                              }
+                            ),
+                            Container(width: 1, color: Colors.grey.shade200),
+                            _buildStatusToggleButton(
+                              label: 'Not OK', 
+                              isSelected: !isOk, 
+                              activeColor: Colors.red,
+                              onTap: () {
+                                setState(() => localAuditData['audit_data'][taskKey]['status'] = 'Not OK');
+                                _processAuditData();
+                                if (localAuditData['audit_data'][taskKey]['nc_category'] == null ||
+                                    localAuditData['audit_data'][taskKey]['nc_category'].toString().isEmpty) {
+                                  _showNCCategoryDialog(index);
+                                }
+                              }
+                            ),
+                          ],
+                        ),
+                      )
+                    else 
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isOk ? Colors.green.shade50 : Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: isOk ? Colors.green.shade100 : Colors.red.shade100),
+                        ),
+                        child: Text(
+                          isOk ? 'OK' : 'Not OK',
+                          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: isOk ? Colors.green.shade700 : Colors.red.shade700),
+                        ),
                       ),
-                      ButtonSegment(
-                        value: 'Not OK',
-                        label: Text('Not OK', style: TextStyle(fontSize: 12)),
-                        icon: Icon(Icons.cancel_outlined, size: 15),
+                    
+                    if (!isOk || item['is_corrected'] == true) ...[
+                      const SizedBox(width: 8),
+                      // Sub-Status / Criticality
+                      SizedBox(
+                        height: 36,
+                        child: widget.isReadOnly
+                          ? Builder(builder: (context) {
+                                final s = subStatus.toString().toUpperCase();
+                                Color bgColor = Colors.grey.shade50;
+                                Color textColor = Colors.black87;
+                                Color borderColor = Colors.grey.shade200;
+
+                                if (s == 'CF') {
+                                  bgColor = Colors.red.shade50;
+                                  textColor = Colors.red.shade700;
+                                  borderColor = Colors.red.shade100;
+                                } else if (s == 'MCF') {
+                                  bgColor = Colors.blue.shade50;
+                                  textColor = Colors.blue.shade700;
+                                  borderColor = Colors.blue.shade100;
+                                }
+
+                                return subStatus.toString().isNotEmpty 
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: bgColor,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: borderColor),
+                                      ),
+                                      child: Text(
+                                        subStatus.toString(),
+                                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                                      ),
+                                    )
+                                  : const SizedBox.shrink();
+                              })
+                            : Builder(builder: (context) {
+                                final s = subStatus.toString().toUpperCase();
+
+                                return ModernSearchableDropdown(
+                                  label: 'Criticality',
+                                  compact: true,
+                                  showLabel: false,
+                                  value: ['Aobs', 'MCF', 'CF'].contains(subStatus.toString()) ? subStatus.toString() : null,
+                                  items: const {'Aobs': 'Aobs', 'MCF': 'MCF', 'CF': 'CF'},
+                                  color: (s == 'CF' ? Colors.red : (s == 'MCF' ? Colors.blue : Colors.grey)),
+                                  icon: Icons.crisis_alert_rounded,
+                                  onChanged: (val) {
+                                      if (val != null) {
+                                        setState(() {
+                                          localAuditData['audit_data'][taskKey]['sub_status'] = val;
+                                          _processAuditData(); // Reactive update
+                                        });
+                                      }
+                                  },
+                                );
+                              }),
                       ),
                     ],
-                    selected: {item['status']?.toString() ?? 'Not OK'},
-                    onSelectionChanged: (Set<String> newSel) {
-                      final newStatus = newSel.first;
-                      setState(() {
-                        localAuditData['audit_data'][taskKey]['status'] = newStatus;
-                      });
-                      _processAuditData();
-                      if (newStatus == 'Not OK' &&
-                          (localAuditData['audit_data'][taskKey]['nc_category'] == null ||
-                           localAuditData['audit_data'][taskKey]['nc_category'].toString().isEmpty)) {
-                        _showNCCategoryDialog(index);
-                      }
-                    },
-                    style: ButtonStyle(
-                      visualDensity: VisualDensity.compact,
-                      padding: WidgetStateProperty.all(const EdgeInsets.symmetric(horizontal: 8)),
-                      backgroundColor: WidgetStateProperty.resolveWith((states) {
-                        if (states.contains(WidgetState.selected)) {
-                          final s = item['status']?.toString() ?? 'Not OK';
-                          return s == 'OK' ? Colors.green.shade100 : Colors.red.shade100;
-                        }
-                        return null;
-                      }),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ] else ...[ 
-                  // Read-only status chip
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isOk ? Colors.green.shade100 : Colors.red.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      isOk ? 'OK' : 'Not OK',
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isOk ? Colors.green[800] : Colors.red[800],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                if (!isOk) ...[
-
-                  // Sub-Status Dropdown (Editable only when not read-only)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    child: widget.isReadOnly
-                        ? (subStatus.toString().isNotEmpty 
-                            ? Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: (subStatus == 'MCF' || subStatus == 'CF') ? Colors.red[50] : Colors.blue[50],
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: (subStatus == 'MCF' || subStatus == 'CF') ? Colors.red[200]! : Colors.blue[200]!),
-                                ),
-                                child: Text(
-                                  subStatus.toString(),
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 11, 
-                                    fontWeight: FontWeight.bold,
-                                    color: (subStatus == 'MCF' || subStatus == 'CF') ? Colors.red[800] : Colors.blue[800]
-                                  ),
-                                ),
-                              )
-                            : const SizedBox.shrink())
-                        : ModernSearchableDropdown(
-                            label: 'Criticality',
-                            value: ['Aobs', 'MCF', 'CF'].contains(subStatus.toString()) ? subStatus.toString() : null,
-                            hint: 'Criticality',
-                            items: const {'Aobs': 'Aobs', 'MCF': 'MCF', 'CF': 'CF'},
-                            color: Colors.red,
-                            icon: Icons.crisis_alert_rounded,
-                            onChanged: (val) {
-                                if (val != null) {
-                                  setState(() => localAuditData['audit_data'][taskKey]['sub_status'] = val);
-                                }
-                            },
+                    
+                    if (referenceName.toString().isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        height: 36,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Ref: $referenceName', 
+                            style: GoogleFonts.outfit(fontSize: 11, color: Colors.grey.shade700, fontWeight: FontWeight.w600)
                           ),
-                  ),
-                  
-                  // Reference Display (Read-Only)
-                  if (referenceName.toString().isNotEmpty) ...[
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: Colors.grey[300]!),
+                        ),
                       ),
-                      child: Text('Ref: $referenceName', style: GoogleFonts.outfit(fontSize: 12, color: Colors.black87, fontWeight: FontWeight.w600)),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ],
             ),
           ),
@@ -2233,46 +2496,20 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
                 const SizedBox(height: 16),
                 
                 // Observation & Remark (Read-Only)
-                Row(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Observation', style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey[600])),
-                          const SizedBox(height: 4),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[50],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[200]!),
-                            ),
-                            child: Text(observation.toString().isNotEmpty ? observation.toString() : '-', style: GoogleFonts.outfit(fontSize: 14)),
-                          ),
-                        ],
+                    Text('Observation', style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey[600])),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey[200]!),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Remark', style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey[600])),
-                          const SizedBox(height: 4),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[50],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[200]!),
-                            ),
-                            child: Text(remark.toString().isNotEmpty ? remark.toString() : '-', style: GoogleFonts.outfit(fontSize: 14)),
-                          ),
-                        ],
-                      ),
+                      child: Text(observation.toString().isNotEmpty ? observation.toString() : '-', style: GoogleFonts.outfit(fontSize: 14)),
                     ),
                   ],
                 ),
@@ -2441,7 +2678,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
                             const SizedBox(height: 4),
                             Text('Plan: ${item['action_plan']}', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black87)),
                           ],
-                          if ((item['action_plan'] == null || item['action_plan'].toString().isEmpty)) ...[
+                          if (item['action_plan'] == null || item['action_plan'].toString().isEmpty) ...[
                             const SizedBox(height: 8),
                             Text('No action plan defined', style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey[500], fontStyle: FontStyle.italic)),
                           ],
@@ -2639,7 +2876,7 @@ class _CategoryStickyHeaderDelegate extends SliverPersistentHeaderDelegate {
             if (header.notOkCount > 0) ...[
               _HeaderPill(
                 label: '${header.notOkCount} NC',
-                bg: const Color(0xFFB71C1C),
+                bg: Colors.blue.shade800,
                 fg: Colors.white,
               ),
               const SizedBox(width: 6),
@@ -2700,7 +2937,7 @@ class _SubCategoryHeaderWidget extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFFB71C1C).withValues(alpha: 0.12),
+                color: Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -2708,7 +2945,7 @@ class _SubCategoryHeaderWidget extends StatelessWidget {
                 style: GoogleFonts.outfit(
                   fontSize: 9.5,
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFFB71C1C),
+                  color: Colors.blue.shade800,
                 ),
               ),
             ),
@@ -2748,12 +2985,12 @@ class StatusRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    int notOkCount = tasks.where((t) => (t['status']?.toString().toLowerCase() ?? '') == 'not ok').length;
-    int totalCount = tasks.length;
+    final int notOkCount = tasks.where((t) => (t['status']?.toString().toLowerCase() ?? '') == 'not ok').length;
+    final int totalCount = tasks.length;
     
     // Logic: Show Not OK count if > 0, else show Total count
-    String centerText = notOkCount > 0 ? '$notOkCount' : '$totalCount';
-    Color centerTextColor = notOkCount > 0 ? Colors.red : Colors.black;
+    final String centerText = notOkCount > 0 ? '$notOkCount' : '$totalCount';
+    final Color centerTextColor = notOkCount > 0 ? Colors.red : Colors.black;
 
     return CustomPaint(
       size: Size(size, size),
@@ -2789,14 +3026,14 @@ class StatusRingPainter extends CustomPainter {
     
     // Draw background circle (light grey) maybe? No, requirement didn't specify.
 
-    final double strokeWidth = 4.0; 
+    const double strokeWidth = 4.0; 
     final Rect rect = Rect.fromLTWH(strokeWidth / 2, strokeWidth / 2, size.width - strokeWidth, size.height - strokeWidth);
     
     double startAngle = -3.14159 / 2; // -90 degrees (Start from top)
-    double sweepAngle = (2 * 3.14159) / tasks.length;
+    final double sweepAngle = (2 * 3.14159) / tasks.length;
     
     // Add a small gap between segments for visual clarity
-    double gap = tasks.length > 1 ? 0.2 : 0.0; // in radians
+    final double gap = tasks.length > 1 ? 0.2 : 0.0; // in radians
     double drawSweep = sweepAngle - gap;
     if (drawSweep <= 0) drawSweep = sweepAngle; // Fallback if too many tasks
 
@@ -2805,10 +3042,10 @@ class StatusRingPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.butt; // Flat ends for donut segments
 
-    for (var task in tasks) {
+    for (final task in tasks) {
       paint.color = _getColor(task);
       // Center the segment in its angular slot if we have a gap
-      double currentStart = startAngle + (gap / 2);
+      final double currentStart = startAngle + (gap / 2);
       canvas.drawArc(rect, currentStart, drawSweep, false, paint);
       startAngle += sweepAngle;
     }
@@ -2816,7 +3053,7 @@ class StatusRingPainter extends CustomPainter {
 
   Color _getColor(Map<String, dynamic> task) {
     final status = task['status']?.toString().toLowerCase() ?? '';
-    final hasObservation = (task['observation']?.toString().trim().isNotEmpty ?? false);
+    final hasObservation = task['observation']?.toString().trim().isNotEmpty ?? false;
 
     // Red: If status is 'Not OK'
     if (status == 'not ok' || status == 'notok' || status == 'not_ok') {
@@ -2829,7 +3066,6 @@ class StatusRingPainter extends CustomPainter {
     }
     
     // Blue: If task is 'Modified' (or has an observation but no final status yet)
-    // Interpret 'Modified' as: Status is empty/pending BUT observation exists
     if (status.isEmpty && hasObservation) {
       return Colors.blue; 
     }

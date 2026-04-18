@@ -50,7 +50,7 @@ class FiveSDashboardScreen extends StatelessWidget {
                         return '0%';
                       }
                       double totalScore = 0;
-                      for (var doc in snapshot.docs) {
+                      for (final doc in snapshot.docs) {
                         final data = doc.data() as Map<String, dynamic>;
                         totalScore += (data['total_score'] as num? ?? 0).toDouble();
                       }

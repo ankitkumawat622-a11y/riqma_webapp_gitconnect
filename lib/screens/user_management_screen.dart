@@ -247,7 +247,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                       label: 'Assigned State',
                       value: selectedState,
                       items: {
-                        for (var state in _states)
+                        for (final state in _states)
                           state['name'].toString(): state['name'].toString()
                       },
                       color: Colors.blue,
@@ -329,7 +329,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     label: 'Assigned State',
                     value: selectedState,
                     items: {
-                      for (var state in _states)
+                      for (final state in _states)
                         state['name'].toString(): state['name'].toString()
                     },
                     color: Colors.blue,

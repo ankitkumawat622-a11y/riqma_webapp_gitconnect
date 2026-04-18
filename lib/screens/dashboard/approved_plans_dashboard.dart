@@ -47,14 +47,14 @@ class _ApprovedPlansDashboardState extends State<ApprovedPlansDashboard> {
           .get();
       
       final Map<String, String> auditors = {};
-      for (var doc in usersSnap.docs) {
+      for (final doc in usersSnap.docs) {
         auditors[doc.id] = (doc.data()['name'] ?? 'Unknown').toString();
       }
 
       // Fetch Models (for Make lookup)
       final modelsSnap = await FirebaseFirestore.instance.collection('turbinemodel').get();
       final Map<String, String> models = {};
-      for (var doc in modelsSnap.docs) {
+      for (final doc in modelsSnap.docs) {
         models[doc.id] = (doc.data()['turbine_make'] ?? 'Unknown').toString();
       }
 
@@ -141,7 +141,7 @@ class _ApprovedPlansDashboardState extends State<ApprovedPlansDashboard> {
               final Set<String> models = {};
 
               if (snapshot.hasData) {
-                for (var doc in snapshot.data!.docs) {
+                for (final doc in snapshot.data!.docs) {
                   final data = doc.data() as Map<String, dynamic>;
                   if (data['state'] != null) states.add(data['state'].toString());
                   if (data['site_name'] != null) sites.add(data['site_name'].toString());
@@ -253,7 +253,7 @@ class _ApprovedPlansDashboardState extends State<ApprovedPlansDashboard> {
     required IconData icon,
     required void Function(String?) onChanged,
   }) {
-    final Map<String, String> itemMap = {for (var item in items) item: item};
+    final Map<String, String> itemMap = {for (final item in items) item: item};
     return SizedBox(
       width: 180,
       child: ModernSearchableDropdown(

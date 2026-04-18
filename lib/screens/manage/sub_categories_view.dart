@@ -90,7 +90,7 @@ class _SubCategoriesViewState extends State<SubCategoriesView> {
                 if (id == null) return;
                 final doc = await FirebaseFirestore.instance.collection('sub_categories').doc(id).get();
                 if (doc.exists) {
-                   state?._addItem(cloneData: SubCategory.fromSnapshot(doc));
+                   await state?._addItem(cloneData: SubCategory.fromSnapshot(doc));
                 }
               },
             ),
@@ -157,7 +157,7 @@ class _SubCategoriesViewState extends State<SubCategoriesView> {
     });
   }
 
-  void _addItem({SubCategory? cloneData}) async {
+  Future<void> _addItem({SubCategory? cloneData}) async {
     final nameController = TextEditingController(text: cloneData?.name ?? '');
     final sortOrderController = TextEditingController(text: cloneData?.sortOrder.toString() ?? '0');
     
@@ -229,7 +229,7 @@ class _SubCategoriesViewState extends State<SubCategoriesView> {
                         
                         final allCategories = categorySnapshot.data!.docs;
                         final Map<String, String> categoryMap = {
-                          for (var doc in allCategories)
+                          for (final doc in allCategories)
                             doc.id: doc.data()['name']?.toString() ?? 'Unknown'
                         };
 
@@ -262,7 +262,7 @@ class _SubCategoriesViewState extends State<SubCategoriesView> {
                                 
                                 final modelDocs = modelSnapshot.data!.docs;
                                 final Map<String, String> modelMap = {
-                                  for (var doc in modelDocs)
+                                  for (final doc in modelDocs)
                                     doc.id: (doc.data() as Map<String, dynamic>).containsKey('turbine_model') 
                                         ? (doc.data() as Map<String, dynamic>)['turbine_model'].toString() 
                                         : ((doc.data() as Map<String, dynamic>).containsKey('name') 
@@ -345,7 +345,7 @@ class _SubCategoriesViewState extends State<SubCategoriesView> {
       )));
   }
 
-  void _editItem(String? docId) async {
+  Future<void> _editItem(String? docId) async {
     if (docId == null) {
       return;
     }
@@ -402,7 +402,7 @@ class _SubCategoriesViewState extends State<SubCategoriesView> {
                         
                         final allCategories = categorySnapshot.data!.docs;
                         final Map<String, String> categoryMap = {
-                          for (var doc in allCategories)
+                          for (final doc in allCategories)
                             doc.id: doc.data()['name']?.toString() ?? 'Unknown'
                         };
 
@@ -434,7 +434,7 @@ class _SubCategoriesViewState extends State<SubCategoriesView> {
                                 
                                 final modelDocs = modelSnapshot.data!.docs;
                                 final Map<String, String> modelMap = {
-                                  for (var doc in modelDocs)
+                                  for (final doc in modelDocs)
                                     doc.id: (doc.data() as Map<String, dynamic>).containsKey('turbine_model') 
                                         ? (doc.data() as Map<String, dynamic>)['turbine_model'].toString() 
                                         : ((doc.data() as Map<String, dynamic>).containsKey('name') 
@@ -547,7 +547,7 @@ class _SubCategoriesViewState extends State<SubCategoriesView> {
         if (!modelSnapshot.hasData) return const Center(child: CircularProgressIndicator());
 
         final modelMap = {
-          for (var doc in modelSnapshot.data!.docs)
+          for (final doc in modelSnapshot.data!.docs)
             doc.id: (doc.data().containsKey('turbine_model') 
                 ? doc.data()['turbine_model'] 
                 : (doc.data().containsKey('name') ? doc.data()['name'] : 'Unknown')).toString()
@@ -559,7 +559,7 @@ class _SubCategoriesViewState extends State<SubCategoriesView> {
         if (!mainCatSnapshot.hasData) return const Center(child: CircularProgressIndicator());
         
         final mainCatMap = {
-          for (var doc in mainCatSnapshot.data!.docs)
+          for (final doc in mainCatSnapshot.data!.docs)
             doc.id: doc.data()
         };
 
@@ -569,7 +569,7 @@ class _SubCategoriesViewState extends State<SubCategoriesView> {
             if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
             final allDocs = snapshot.data!.docs;
-            List<SubCategory> subCategories = allDocs.map((d) => SubCategory.fromSnapshot(d)).toList();
+            final List<SubCategory> subCategories = allDocs.map((d) => SubCategory.fromSnapshot(d)).toList();
             
             // Apply Filtering Logic
             final filteredSubCategories = subCategories.where((subCat) {
@@ -735,7 +735,7 @@ class _SubCategoriesViewState extends State<SubCategoriesView> {
 
                       final Map<String, String> items = {
                         'All': 'All Categories',
-                        for (var doc in categories)
+                        for (final doc in categories)
                           doc.id: (doc.data()['name'] ?? 'Unknown').toString()
                       };
 

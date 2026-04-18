@@ -293,7 +293,7 @@ class _TurbineModelsViewState extends State<TurbineModelsView> {
     ));
   }
 
-  void _editItem(String? docId) async {
+  Future<void> _editItem(String? docId) async {
     if (docId == null) {
       return;
     }
@@ -320,7 +320,7 @@ class _TurbineModelsViewState extends State<TurbineModelsView> {
         }
       } else if (data.containsKey('site_ref')) {
         // Legacy support
-        DocumentReference? ref = data['site_ref'] as DocumentReference?;
+        final DocumentReference? ref = data['site_ref'] as DocumentReference?;
         if (ref != null) {
           selectedSiteIds.add(ref.id);
           if (data.containsKey('site_name')) {

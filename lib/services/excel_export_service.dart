@@ -6,7 +6,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' hide Column, Row, Border;
-import 'package:web/web.dart' as web;
+import 'package:web/web.dart' as web hide Range;
 
 class ExcelExportService {
   // ===========================================================================
@@ -19,6 +19,15 @@ class ExcelExportService {
     'Action Taken', 'Closing Date', 'Closing Evidence', 'Status', 'Remarks.'
   ];
 
+  static const List<String> _sqaDumpHeaders = <String>[
+    'Sr. No.', 'Financial Year', 'WTG Category', 'Turbine Name', 'Date Of Audit', 'Turbine Make', 'Turbine Model', 
+    'Turbine Rating (MW)', 'Site Name', 'District Name', 'State', 'Zone', 
+    'Warehouse Code', 'Customer Name', 'Main Head', 'Sub Component', 
+    'Finding/Observation', 'NC Criticality (CF/MCF/AObs)', 'Rating Category', 
+    'Reason of NC (Cause of NC)', 'Plan Date of NC closure', 'Plan of Action', 
+    'Date Of Closure', 'Action Taken', 'Status', 'No. Of Days Taken', 'Auditor Name'
+  ];
+
   /// Fetches NC documents from the 'ncs' collection linked to this audit.
   Future<Map<String, Map<String, dynamic>>> _fetchNCsForAudit(String auditId) async {
     final Map<String, Map<String, dynamic>> ncMap = {};
@@ -28,7 +37,7 @@ class ExcelExportService {
           .where('audit_ref', isEqualTo: FirebaseFirestore.instance.doc('/audit_submissions/$auditId'))
           .get();
       
-      for (var doc in snapshot.docs) {
+      for (final doc in snapshot.docs) {
         final data = doc.data();
         final taskKey = data['task_key']?.toString();
         if (taskKey != null) {
@@ -55,6 +64,7 @@ class ExcelExportService {
       sheet.setRowHeightInPixels(1, 40);
       sheet.setColumnWidthInPixels(7, 250); // Finding/Observation
       sheet.setColumnWidthInPixels(8, 200); // Finding Photos
+      sheet.setColumnWidthInPixels(16, 160); // Closing Evidence Photos
 
       // Fetch live NCs for "Live" tracking data
       final Map<String, Map<String, dynamic>> liveNCs = await _fetchNCsForAudit(auditId);
@@ -155,6 +165,16 @@ class ExcelExportService {
 
       if (srNo == 1) {
         sheet.getRangeByIndex(2, 7).setText('No NCs or corrected tasks found');
+      } else {
+        // Apply formatting to the whole data range (NC Tracking Only)
+        final Range dataRange = sheet.getRangeByIndex(1, 1, rowIndex - 1, _sqaNcHeaders.length);
+        dataRange.cellStyle.hAlign = HAlignType.center;
+        dataRange.cellStyle.vAlign = VAlignType.center;
+        dataRange.cellStyle.wrapText = true;
+        
+        // Apply borders to all sides of each cell in the range
+        dataRange.cellStyle.borders.all.lineStyle = LineStyle.thin;
+        dataRange.cellStyle.borders.all.color = '#BFBFBF'; // Light grey borders
       }
 
       // Filename Helper usage
@@ -205,6 +225,22 @@ class ExcelExportService {
       final siteName = (auditData['site'] ?? 'Unknown').toString();
       final turbineNo = (auditData['turbine'] ?? '').toString();
       
+      // Fetch WTG Category from 'turbines' collection if possible
+      String wtgCategory = 'old';
+      try {
+        final turbineSnap = await FirebaseFirestore.instance
+            .collection('turbines')
+            .where('name', isEqualTo: turbineNo)
+            .limit(1)
+            .get();
+        if (turbineSnap.docs.isNotEmpty) {
+          wtgCategory = (turbineSnap.docs.first.data()['wtg_category'] ?? 'old').toString();
+        }
+      } catch (_) {}
+
+      final auditorName = (auditData['auditor_name'] ?? '').toString();
+      final fy = auditDate != null ? _getFinancialYear(auditDate) : '';
+      
       // Use fetched data or fallback to auditData
       final turbineMake = (masterData['turbine_make'] ?? auditData['wtg_model'] ?? '').toString(); // wtg_model is sometimes used as make key in legacy? fallback
       final district = (masterData['district'] ?? auditData['district'] ?? '').toString();
@@ -222,15 +258,8 @@ class ExcelExportService {
       final Worksheet sheet1 = workbook.worksheets[0];
       sheet1.name = 'MIS SQA NC Details';
 
-      final List<String> sheet1Headers = <String>[
-        'Sr. No.', 'Audit Date', 'Turbine Name', 'Reference', 'Main Category', 'Sub Category',
-        'Finding/Observation', 'Finding Photos', 'NC Criticality (CF/MCF/AObs)', 'NC Category',
-        'Reason of NC (Cause of NC)', 'Plan Date of NC closure', 'Plan of Action',
-        'Action Taken', 'Closing Date', 'Closing Evidence', 'Status', 'Remarks.'
-      ];
-      _writeExcelHeaders(sheet1, sheet1Headers, width: 100.0);
-      sheet1.setColumnWidthInPixels(7, 250); // Observation column wider
-      sheet1.setColumnWidthInPixels(8, 100); // Photos column
+      _writeExcelHeaders(sheet1, _sqaDumpHeaders, width: 100.0);
+      sheet1.setColumnWidthInPixels(15, 250); // Observation column wider (now 15th)
 
       // Process tasks and calculate penalties
       final Map<String, Map<String, dynamic>> liveNCs = await _fetchNCsForAudit(auditId);
@@ -263,9 +292,21 @@ class ExcelExportService {
         final String ncCategory = (nc?['nc_category'] ?? task['nc_category'] ?? '').toString();
         final String rootCause = (nc?['root_cause'] ?? task['root_cause'] ?? '').toString();
         final String actionPlan = (nc?['action_plan'] ?? task['action_plan'] ?? '').toString();
-        final String actionTaken = (nc?['action_taken'] ?? task['closure_remark'] ?? (isCorrected ? 'Corrected' : '')).toString();
-        final String ncStatus = (nc?['status'] ?? (isCorrected ? 'Close' : 'Open')).toString();
-        final String remarks = (nc?['remarks'] ?? task['closure_remark'] ?? '').toString();
+        
+        // Custom logic for OSC
+        final String actionTaken = (isCorrected 
+            ? (task['closure_remark'] ?? 'OSC Corrected')
+            : (nc?['action_taken'] ?? task['closure_remark'] ?? '')).toString();
+        
+        final String ncStatus = (isCorrected ? 'OSC Close' : (nc?['status'] ?? 'Open')).toString();
+
+        // Rating Category
+        int rating = 1;
+        if (criticality == 'CF') {
+          rating = 3;
+        } else if (criticality == 'MCF') {
+          rating = 2;
+        }
 
         // Date Parsing
         String planDate = '';
@@ -282,6 +323,16 @@ class ExcelExportService {
           if (d != null) closingDate = DateFormat('dd-MM-yyyy').format(d);
         }
 
+        // Days Taken calculation
+        int daysTaken = 0;
+        if (closeVal != null && auditDate != null) {
+          final dClose = _parseDate(closeVal);
+          if (dClose != null) {
+            daysTaken = dClose.difference(auditDate).inDays;
+            if (daysTaken < 0) daysTaken = 0;
+          }
+        }
+
         // Calculate penalties
         final penalties = _calculatePenalties(criticality, ncCategory, workmanPenaltyMap);
         totalWorkmanPenalty += penalties['workman']!;
@@ -290,42 +341,39 @@ class ExcelExportService {
           criticalNCCount++;
         }
 
-        // Write row
+        // Write row (27 columns)
         _writeExcelRow(sheet1, rowIndex, <String>[
           srNo.toString(),
-          auditDateStr,
+          fy,
+          wtgCategory,
           turbineNo,
-          (nc?['reference_name'] ?? task['reference_name'] ?? '-').toString(),
+          auditDateStr,
+          turbineMake,
+          turbineModel,
+          turbineRating,
+          siteName,
+          district,
+          state,
+          zone,
+          warehouseCode,
+          customerName,
           (task['main_category_name'] ?? '-').toString(),
           (task['sub_category_name'] ?? '-').toString(),
           (nc?['finding'] ?? task['observation'] ?? '-').toString(),
-          '', // Finding Photos placeholder
           criticality,
-          ncCategory,
+          rating.toString(),
           rootCause,
           planDate,
           actionPlan,
-          actionTaken,
           closingDate,
-          '', // Closing Evidence
+          actionTaken,
           ncStatus,
-          remarks,
+          daysTaken.toString(),
+          auditorName,
         ]);
 
-        // Embedding Multiple Finding Photos
-        final List<dynamic> findingPhotos = (nc != null && nc['photos'] is List) ? nc['photos'] as List<dynamic> : (task['photos'] is List ? task['photos'] as List<dynamic> : <dynamic>[]);
-        if (findingPhotos.isNotEmpty) {
-          await _embedImages(sheet1, rowIndex, 8, findingPhotos);
-        }
-
-        // Embedding Closure Evidence
-        final String? closurePhoto = nc?['closure_photo']?.toString() ?? task['closure_photo']?.toString();
-        if (closurePhoto != null && closurePhoto.isNotEmpty) {
-          await _embedSingleImage(sheet1, rowIndex, 16, closurePhoto);
-        }
-
-        // Apply conditional coloring to Observation cell (Column 7)
-        sheet1.getRangeByIndex(rowIndex, 7).cellStyle.fontColor = _getFontColorForStatus(criticality);
+        // Apply conditional coloring to Observation cell (Column 17)
+        sheet1.getRangeByIndex(rowIndex, 17).cellStyle.fontColor = _getFontColorForStatus(criticality);
 
         srNo++;
         rowIndex++;
@@ -381,14 +429,7 @@ class ExcelExportService {
             remarks,
           ]);
 
-          if (nc['photos'] is List && (nc['photos'] as List).isNotEmpty) {
-            _embedImages(sheet1, rowIndex, 8, nc['photos'] as List);
-          }
-          if (nc['closure_photo'] != null) {
-            _embedSingleImage(sheet1, rowIndex, 16, nc['closure_photo'].toString());
-          }
 
-          sheet1.getRangeByIndex(rowIndex, 7).cellStyle.fontColor = _getFontColorForStatus(criticality);
           srNo++;
           rowIndex++;
         }
@@ -405,13 +446,13 @@ class ExcelExportService {
       sheet2.name = 'WTG Assessment';
 
       final List<String> sheet2Headers = <String>[
-        'Sr. No.', 'Turbine No', 'Date Of Audit', 'Turbine Make', 'Turbine Model',
+        'Sr. No.', 'FY', 'WTG Type (New/Existing)', 'Turbine No', 'Date Of Audit', 'Turbine Make', 'Turbine Model',
         'Turbine Rating (MW)', 'Site Name', 'District Name', 'State', 'Zone',
         'Warehouse Code', 'Customer Name', 'Commission Date (DOC)', 'Renom Date Of Takeover (DOT)',
         'SQA Audit Overall Assessment', 'Overall Compliance Ok (%)', 'Workman Assessments',
         'Workman PM Compliance Ok (%)', 'No of finding having 3 Nos rating NC',
         'PM Plan Date', 'PM Done Date', 'PM Adherence (+/-7 Days)', 'PM Vs QA Aging',
-        'PM Type', 'PM Lead', 'PM Team', 'Report Status', 'Remark'
+        'PM Type', 'PM Lead', 'PM Team', 'Report Status', 'Auditor Name', 'Remark'
       ];
       _writeExcelHeaders(sheet2, sheet2Headers, width: 100.0);
 
@@ -442,20 +483,41 @@ class ExcelExportService {
       final pmMembers = auditData['pm_team_members'] is List ? (auditData['pm_team_members'] as List).join(', ') : '';
       final pmType = auditData['maintenance_type']?.toString() ?? '';
 
-      // Write summary row
+      String fmtD(DateTime? d) => d != null ? DateFormat('dd-MM-yyyy').format(d) : '';
+
+      // Write summary row (31 columns)
       _writeExcelRow(sheet2, 2, <String>[
-        '1', turbineNo, auditDateStr, turbineMake, turbineModel,
-        turbineRating, siteName, district, state, zone,
-        warehouseCode, customerName,
-        commissioningDate != null ? DateFormat('dd-MM-yyyy').format(commissioningDate) : '',
-        takeOverDate != null ? DateFormat('dd-MM-yyyy').format(takeOverDate) : '',
-        _getAssessmentLabel(overallScore), '${overallCompliance.toStringAsFixed(2)}%',
-        _getAssessmentLabel(workmanScore), '${workmanCompliance.toStringAsFixed(2)}%',
+        '1',
+        fy,
+        wtgCategory.toLowerCase() == 'new' ? 'New' : 'Existing',
+        turbineNo,
+        auditDateStr,
+        turbineMake,
+        turbineModel,
+        turbineRating,
+        siteName,
+        district,
+        state,
+        zone,
+        warehouseCode,
+        customerName,
+        fmtD(commissioningDate),
+        fmtD(takeOverDate),
+        overallScore.toStringAsFixed(1),
+        '${overallCompliance.toStringAsFixed(2)}%',
+        workmanScore.toStringAsFixed(1),
+        '${workmanCompliance.toStringAsFixed(2)}%',
         criticalNCCount.toString(),
-        pmPlanDate != null ? DateFormat('dd-MM-yyyy').format(pmPlanDate) : '',
-        pmDoneDate != null ? DateFormat('dd-MM-yyyy').format(pmDoneDate) : '',
-        pmAdherence, pmVsQaAging.toString(),
-        pmType, pmLead, pmMembers, 'Open', ''
+        fmtD(pmPlanDate),
+        fmtD(pmDoneDate),
+        pmAdherence,
+        pmVsQaAging.toString(),
+        pmType,
+        pmLead,
+        pmMembers,
+        'Open',
+        auditorName,
+        '',
       ]);
 
       // Save and download
@@ -562,7 +624,8 @@ class ExcelExportService {
         final isCorrected = task['is_corrected'] == true;
         
         // Include if Not OK, Corrected, or if an NC document exists for this task
-        if (status != 'ok' || isCorrected || nc != null) {
+        // Exclude 'OK' and 'NA' checklist points that are not findings
+        if ((status != 'ok' && status != 'na' && status != 'n/a') || isCorrected || nc != null) {
           final refName = nc?['reference_name']?.toString() ??
               task['reference_name']?.toString() ??
               task['referenceoftask']?.toString() ??
@@ -614,16 +677,19 @@ class ExcelExportService {
       int criticalNCCount = 0;
       
       groupedTasks.forEach((refName, taskList) {
-        // Collect observations with bullets
-        final List<String> observations = [];
+        // Collect detailed points for RichText and finding info
+        final List<Map<String, String>> observationPoints = [];
         for (int i = 0; i < taskList.length; i++) {
-          var obs = taskList[i]['observation']?.toString() ??
-              taskList[i]['question']?.toString() ?? '';
-          if (taskList[i]['is_corrected'] == true) {
-            obs += " (Corrected on Site)";
+          final t = taskList[i];
+          var obsText = t['observation']?.toString() ?? t['question']?.toString() ?? '';
+          if (t['is_corrected'] == true) {
+            obsText += ' (Corrected on Site)';
           }
-          if (obs.isNotEmpty) {
-            observations.add('${i + 1}. $obs');
+          if (obsText.isNotEmpty) {
+            observationPoints.add({
+              'text': '${i + 1}. $obsText',
+              'color': _getFontColorForStatus(t['sub_status']?.toString() ?? 'Aobs'),
+            });
           }
         }
 
@@ -631,9 +697,11 @@ class ExcelExportService {
         Map<String, dynamic>? highestSeverityTask;
         int highestPriority = -1;
         for (final task in taskList) {
-          final subStatus = task['sub_status']?.toString() ?? 'OK';
-          final priority = subStatusPriority[subStatus] ?? 0;
+          // Default to Aobs for findings that lack a sub-status
+          final currentSubStatus = task['sub_status']?.toString() ?? 'Aobs';
+          final priority = subStatusPriority[currentSubStatus] ?? 0;
           final ncCategory = task['nc_category']?.toString();
+
           if (priority > highestPriority ||
               (priority == highestPriority && ncCategory == 'Quality of Workmanship')) {
             highestPriority = priority;
@@ -641,9 +709,9 @@ class ExcelExportService {
           }
         }
 
-        final subStatus = highestSeverityTask?['sub_status']?.toString() ?? 'OK';
-        final ncCategory = highestSeverityTask?['nc_category']?.toString();
-        final penalties = _calculatePenalties(subStatus, ncCategory, workmanPenaltyMap);
+        final finalSubStatus = highestSeverityTask?['sub_status']?.toString() ?? 'Aobs';
+        final finalNcCategory = highestSeverityTask?['nc_category']?.toString();
+        final penalties = _calculatePenalties(finalSubStatus, finalNcCategory, workmanPenaltyMap);
 
         totalWorkmanPenalty += penalties['workman']!;
         totalOverallPenalty += penalties['overall']!;
@@ -657,11 +725,12 @@ class ExcelExportService {
           }
         }
 
-        if (observations.isNotEmpty) {
+        if (observationPoints.isNotEmpty) {
            processedTasks.add({
              'srNo': serialCounter++,
-             'observation': '[$refName]\n${observations.join("\n")}',
-             'subStatus': subStatus,
+             'refName': refName,
+             'points': observationPoints,
+             'subStatus': finalSubStatus,
              'workmanScore': penalties['workman']!,
              'overallScore': penalties['overall']!,
            });
@@ -727,34 +796,42 @@ class ExcelExportService {
       sheet.getRangeByIndex(2, 3).setText('SQA Audit Report');
       cellStyle(2, 3, fontSize: 16, bold: true, backColor: '#FFFFFF', fontColor: '#000000');
       
+      String getRatingColor(double s) {
+        if (s >= 13.5) return '#00B050'; // Excellent
+        if (s >= 10.5) return '#FFFF00'; // Good
+        if (s >= 7.5)  return '#00B0F0'; // Improvements Required
+        if (s >= 4.5)  return '#FABF8F'; // Poor
+        return '#FF0000';                // Worst
+      }
+
       sheet.getRangeByIndex(2, 9, 3, 9).merge();
       sheet.getRangeByIndex(2, 9).setText(workmanScore.toStringAsFixed(1));
-      cellStyle(2, 9, bold: true, fontSize: 12, backColor: '#D9E1F2');
+      cellStyle(2, 9, bold: true, fontSize: 12, backColor: getRatingColor(workmanScore), fontColor: (workmanScore >= 10.5 && workmanScore < 13.5) || (workmanScore >= 4.5 && workmanScore < 7.5) ? '#000000' : '#FFFFFF');
       
       sheet.getRangeByIndex(2, 10, 3, 10).merge();
       sheet.getRangeByIndex(2, 10).setText(overallScore.toStringAsFixed(1));
-      cellStyle(2, 10, bold: true, fontSize: 12, backColor: '#D9E1F2');
+      cellStyle(2, 10, bold: true, fontSize: 12, backColor: getRatingColor(overallScore), fontColor: (overallScore >= 10.5 && overallScore < 13.5) || (overallScore >= 4.5 && overallScore < 7.5) ? '#000000' : '#FFFFFF');
       
       applyBorders(2, 2, 3, 10);
 
       // -----------------------------------------------------------------------
       // Row 4 - Rating Scale
       // -----------------------------------------------------------------------
-      sheet.getRangeByIndex(4, 2).setText('Excellent (14-15)');
-      cellStyle(4, 2, backColor: '#27AE60', fontColor: '#FFFFFF');
+      sheet.getRangeByIndex(4, 2).setText('Excellent (13.5-15)');
+      cellStyle(4, 2, backColor: '#00B050', fontColor: '#FFFFFF');
       
       sheet.getRangeByIndex(4, 3, 4, 4).merge();
-      sheet.getRangeByIndex(4, 3).setText('Good (11-13)');
-      cellStyle(4, 3, backColor: '#F1C40F');
+      sheet.getRangeByIndex(4, 3).setText('Good (10.5-13)');
+      cellStyle(4, 3, backColor: '#FFFF00', fontColor: '#000000');
       
-      sheet.getRangeByIndex(4, 5).setText('Improvement (8-10)');
-      cellStyle(4, 5, backColor: '#3498DB', fontColor: '#FFFFFF');
+      sheet.getRangeByIndex(4, 5).setText('Improvements Required (7.5-10)');
+      cellStyle(4, 5, backColor: '#00B0F0', fontColor: '#FFFFFF');
       
-      sheet.getRangeByIndex(4, 6).setText('Poor (5-7)');
-      cellStyle(4, 6, backColor: '#E67E22', fontColor: '#FFFFFF');
+      sheet.getRangeByIndex(4, 6).setText('Poor (4.5-7)');
+      cellStyle(4, 6, backColor: '#FABF8F', fontColor: '#000000');
       
       sheet.getRangeByIndex(4, 7).setText('Worst (<4.5)');
-      cellStyle(4, 7, backColor: '#E74C3C', fontColor: '#FFFFFF');
+      cellStyle(4, 7, backColor: '#FF0000', fontColor: '#FFFFFF');
       
       sheet.getRangeByIndex(4, 8).setText('SQA Indicator');
       cellStyle(4, 8, bold: true, backColor: '#BDC3C7');
@@ -946,12 +1023,19 @@ class ExcelExportService {
           cellStyle(row, 2);
           
           sheet.getRangeByIndex(row, 3, row, 7).merge();
-          sheet.getRangeByIndex(row, 3).setText(task['observation'].toString());
+          final range = sheet.getRangeByIndex(row, 3);
+          final String refName = task['refName'].toString();
+          final List<Map<String, String>> points = List<Map<String, String>>.from(task['points'] as List);
+          final dynamic r = range;
+          r.richText.addText('[$refName]', Font()..bold = true..color = '#34495E');
+          for (final p in points) {
+            r.richText.addText('\n${p['text']}', Font()..color = p['color']!);
+          }
+
           cellStyle(
             row, 3, 
             hAlign: HAlignType.left, 
-            wrapText: true, 
-            fontColor: _getFontColorForStatus(task['subStatus'].toString())
+            wrapText: true,
           );
           
           sheet.getRangeByIndex(row, 8).setText(task['subStatus'].toString());
@@ -977,7 +1061,7 @@ class ExcelExportService {
       // -----------------------------------------------------------------------
       // Footer Section
       // -----------------------------------------------------------------------
-      int footerStartRow = row;
+      final int footerStartRow = row;
 
       // Row 28
       sheet.setRowHeightInPixels(row, 20);
@@ -992,43 +1076,64 @@ class ExcelExportService {
       jCell28.setText(totalOverallPenalty.toString());
       
       row++;
-      // Row 29
+      // Row 29-30 (Workman Section)
       sheet.getRangeByIndex(row, 2).setText('Workman Assessments');
       sheet.getRangeByIndex(row, 3, row, 5).merge();
       sheet.getRangeByIndex(row, 3).setText(workmanScore.toStringAsFixed(2));
-      sheet.getRangeByIndex(row, 6, row, 7).merge();
-      sheet.getRangeByIndex(row, 6).setText('Remarks Of Workman assessments');
-      sheet.getRangeByIndex(row, 8, row, 10).merge();
-      double ws = double.tryParse(workmanScore.toStringAsFixed(1)) ?? 15.0;
-      String wRem = ws >= 14 ? 'Excellent' : ws >= 11 ? 'Good' : ws >= 8 ? 'Improvement' : ws >= 5 ? 'Poor' : 'Worst';
-      sheet.getRangeByIndex(row, 8).setText(wRem);
+      
+      // Workman Remark Box (Spans 2 rows: F to G and H to J)
+      final wRangeLabel = sheet.getRangeByIndex(row, 6, row + 1, 7);
+      wRangeLabel.merge();
+      wRangeLabel.setText('Remarks Of Workman assessments');
+      wRangeLabel.cellStyle.bold = true;
+      wRangeLabel.cellStyle.wrapText = true;
+      wRangeLabel.cellStyle.vAlign = VAlignType.center;
+      
+      final wRangeRating = sheet.getRangeByIndex(row, 8, row + 1, 10);
+      wRangeRating.merge();
+      final double wsVal = double.tryParse(workmanScore.toStringAsFixed(1)) ?? 15.0;
+      final String wRemStr = wsVal >= 13.5 ? 'Excellent' : wsVal >= 10.5 ? 'Good' : wsVal >= 7.5 ? 'Improvements Required' : wsVal >= 4.5 ? 'Poor' : 'Need to do re-PM';
+      wRangeRating.setText(wRemStr);
+      wRangeRating.cellStyle.bold = true;
+      wRangeRating.cellStyle.backColor = getRatingColor(wsVal);
+      wRangeRating.cellStyle.vAlign = VAlignType.center;
+      wRangeRating.cellStyle.fontColor = (wsVal >= 10.5 && wsVal < 13.5) || (wsVal >= 4.5 && wsVal < 7.5) ? '#000000' : '#FFFFFF';
 
       row++;
-      // Row 30
+      // Row 30 (Workman PM Compliance)
       sheet.getRangeByIndex(row, 2).setText('Workman PM Compliance');
       sheet.getRangeByIndex(row, 3, row, 5).merge();
       sheet.getRangeByIndex(row, 3).setText('${workmanCompliance.toStringAsFixed(2)}%');
-      sheet.getRangeByIndex(row, 6, row, 10).merge(); 
 
       row++;
-      // Row 31
+      // Row 31-32 (Overall Section)
       sheet.getRangeByIndex(row, 2).setText('Overall Assessments');
       sheet.getRangeByIndex(row, 3, row, 5).merge();
       sheet.getRangeByIndex(row, 3).setText(overallScore.toStringAsFixed(2));
-      sheet.getRangeByIndex(row, 6, row, 7).merge();
-      sheet.getRangeByIndex(row, 6).setText('Remarks Of Overall assessments');
-      sheet.getRangeByIndex(row, 8, row, 10).merge();
-      double os = double.tryParse(overallScore.toStringAsFixed(1)) ?? 15.0;
-      String oRem = os >= 14 ? 'Excellent' : os >= 11 ? 'Good' : os >= 8 ? 'Improvement' : os >= 5 ? 'Poor' : 'Worst';
-      sheet.getRangeByIndex(row, 8).setText(oRem);
+      
+      // Overall Remark Box (Spans 2 rows: F to G and H to J)
+      final oRangeLabel = sheet.getRangeByIndex(row, 6, row + 1, 7);
+      oRangeLabel.merge();
+      oRangeLabel.setText('Remarks Of Overall assessments');
+      oRangeLabel.cellStyle.bold = true;
+      oRangeLabel.cellStyle.wrapText = true;
+      oRangeLabel.cellStyle.vAlign = VAlignType.center;
+      
+      final oRangeRating = sheet.getRangeByIndex(row, 8, row + 1, 10);
+      oRangeRating.merge();
+      final double osVal = double.tryParse(overallScore.toStringAsFixed(1)) ?? 15.0;
+      final String oRemStr = osVal >= 13.5 ? 'Excellent' : osVal >= 10.5 ? 'Good' : osVal >= 7.5 ? 'Improvements Required' : osVal >= 4.5 ? 'Poor' : 'Worst';
+      oRangeRating.setText(oRemStr);
+      oRangeRating.cellStyle.bold = true;
+      oRangeRating.cellStyle.backColor = getRatingColor(osVal);
+      oRangeRating.cellStyle.vAlign = VAlignType.center;
+      oRangeRating.cellStyle.fontColor = (osVal >= 10.5 && osVal < 13.5) || (osVal >= 4.5 && osVal < 7.5) ? '#000000' : '#FFFFFF';
 
       row++;
-      // Row 32
+      // Row 32 (Overall Compliance)
       sheet.getRangeByIndex(row, 2).setText('Overall Compliance');
       sheet.getRangeByIndex(row, 3, row, 5).merge();
       sheet.getRangeByIndex(row, 3).setText('${overallCompliance.toStringAsFixed(2)}%');
-      sheet.getRangeByIndex(row, 6, row, 10).merge(); 
-
       row++;
       // Row 33
       sheet.getRangeByIndex(row, 2).setText('Number of CF');
@@ -1042,6 +1147,31 @@ class ExcelExportService {
       sheet.getRangeByIndex(row, 8).setText('Date Report Submitted/Share');
       final submissionDate = _parseDate(reportMeta['submission_date'] ?? auditData['submission_date'] ?? auditData['timestamp']);
       sheet.getRangeByIndex(row, 10).setText(fmtDate(submissionDate));
+
+      row++;
+      // Row 34: Explanatory Note
+      final noteRange = sheet.getRangeByIndex(row, 2, row, 10);
+      noteRange.merge();
+      noteRange.setText('(Note: Assinged NC sequence as per rating reference sheet. And all audit NC\'s mentioned under “Type of NC” and color coding (font color) in NC description represented: Red–CF, Blue–MCF, Black–Aobs.)');
+      noteRange.cellStyle.fontSize = 9;
+      noteRange.cellStyle.fontName = 'Arial';
+      noteRange.cellStyle.italic = true;
+      noteRange.cellStyle.wrapText = true;
+      noteRange.cellStyle.vAlign = VAlignType.center;
+      noteRange.cellStyle.hAlign = HAlignType.left;
+      sheet.setRowHeightInPixels(row, 40); // Give enough space for wrapping
+
+      // -----------------------------------------------------------------------
+      // 8. PAGE SETUP & PRINT SETTINGS
+      // -----------------------------------------------------------------------
+      // This disclaimer only shows when printing/PDF exporting, not in the excel grid.
+      // sheet.pageSetup.centerFooter = 'This report is generated by Renom Integrated Quality Management System';
+      sheet.pageSetup.orientation = ExcelPageOrientation.portrait;
+      sheet.pageSetup.isFitToPage = true;
+      sheet.pageSetup.topMargin = 0.5;
+      sheet.pageSetup.bottomMargin = 0.5;
+      sheet.pageSetup.leftMargin = 0.5;
+      sheet.pageSetup.rightMargin = 0.5;
       
       // Formatting and styling
       final footerRange = sheet.getRangeByIndex(footerStartRow, 2, row, 10);
@@ -1209,40 +1339,38 @@ class ExcelExportService {
 
   /// Returns font color based on NC Category (sub_status).
   String _getFontColorForStatus(String subStatus) {
-    final status = subStatus.toLowerCase();
-    if (status == 'cf') return '#FF0000'; // Red
-    if (status == 'mcf') return '#0000FF'; // Blue
-    return '#000000'; // Black
+    final status = subStatus.toUpperCase();
+    if (status == 'MCF') return '#0000FF'; // Blue
+    if (status == 'CF') return '#FF0000'; // Red
+    return '#000000'; // Black for Aobs, etc.
   }
 
   double _getAssessmentScore(int penaltyPoints) {
-    if (penaltyPoints <= 0) {
-      return 15.0;
+    if (penaltyPoints <= 0) return 15.0;
+    if (penaltyPoints >= 66) return 0.1;
+
+    // Follow the Non-Linear curve from Column W of the official SQA Rating Table
+    if (penaltyPoints <= 20) {
+      // Linear drop of 0.5 per point (0 to 20 penalty = 15.0 to 5.0 score)
+      return 15.0 - (penaltyPoints * 0.5);
+    } else if (penaltyPoints == 21) {
+      return 4.8;
+    } else if (penaltyPoints == 22) {
+      return 4.5;
+    } else {
+      // 23 to 66 penalty = 4.4 to 0.1 score (Red Section: 0.1 drop per point)
+      final score = 4.4 - ((penaltyPoints - 23) * 0.1);
+      // Ensure we return a clean decimal for reporting
+      return double.parse(score.toStringAsFixed(1));
     }
-    if (penaltyPoints >= 66) {
-      return 0.1;
-    }
-    return 15.0 - (penaltyPoints * 0.5);
   }
 
-  String _getAssessmentLabel(double score) {
-    if (score >= 13.5) {
-      return 'Excellent';
-    }
-    if (score >= 12) {
-      return 'Good';
-    }
-    if (score >= 9) {
-      return 'Improvement';
-    }
-    if (score >= 6) {
-      return 'Poor';
-    }
-    return 'Worst';
-  }
+
 
   double _getCompliancePercentage(int totalPenalty) {
-    return ((1 - (totalPenalty / 75)) * 100).clamp(0.0, 100.0);
+    // Formula: 100% - (Total Penalty * 100 / 75)
+    final double pct = 100.0 - (totalPenalty * 100 / 75.0);
+    return pct.clamp(0.0, 100.0);
   }
 
   DateTime? _parseDate(dynamic value) {
@@ -1269,21 +1397,20 @@ class ExcelExportService {
     // SHEET 1
     final Worksheet sheet1 = workbook.worksheets[0];
     sheet1.name = 'MIS SQA NC Details';
-    _writeExcelHeaders(sheet1, _sqaNcHeaders, width: 100.0);
-    sheet1.setColumnWidthInPixels(7, 250);
-    sheet1.setColumnWidthInPixels(8, 200); // Expanded for multi-photo
+    _writeExcelHeaders(sheet1, _sqaDumpHeaders, width: 100.0);
+    sheet1.setColumnWidthInPixels(15, 250); // Observation column wider (now 15th)
 
     // SHEET 2
     final Worksheet sheet2 = workbook.worksheets[1];
     sheet2.name = 'WTG Assessment';
     _writeExcelHeaders(sheet2, <String>[
-      'Sr. No.', 'Turbine No', 'Date Of Audit', 'Turbine Make', 'Turbine Model',
+      'Sr. No.', 'FY', 'WTG Type (New/Existing)', 'Turbine No', 'Date Of Audit', 'Turbine Make', 'Turbine Model',
       'Turbine Rating (MW)', 'Site Name', 'District Name', 'State', 'Zone',
       'Warehouse Code', 'Customer Name', 'Commission Date (DOC)', 'Renom Date Of Takeover (DOT)',
       'SQA Audit Overall Assessment', 'Overall Compliance Ok (%)', 'Workman Assessments',
       'Workman PM Compliance Ok (%)', 'No of finding having 3 Nos rating NC',
       'PM Plan Date', 'PM Done Date', 'PM Adherence (+/-7 Days)', 'PM Vs QA Aging',
-      'PM Type', 'PM Lead', 'PM Team', 'Report Status', 'Remark'
+      'PM Type', 'PM Lead', 'PM Team', 'Report Status', 'Auditor Name', 'Remark'
     ], width: 100.0);
 
     // -------------------------------------------------------------------------
@@ -1416,6 +1543,21 @@ class ExcelExportService {
       final zone          = zoneVal.isNotEmpty ? zoneVal : (docData['zone'] ?? '').toString();
       final state         = (docData['state']          ?? '').toString();
       final customerName  = (docData['customer_name']  ?? '').toString();
+      final auditorName   = (docData['auditor_name']   ?? '').toString();
+      final fy            = auditDate != null ? _getFinancialYear(auditDate) : '';
+
+      // Fetch WTG Category
+      String wtgCategory = 'old';
+      try {
+        final turbineSnap = await FirebaseFirestore.instance
+            .collection('turbines')
+            .where('name', isEqualTo: turbineNo)
+            .limit(1)
+            .get();
+        if (turbineSnap.docs.isNotEmpty) {
+          wtgCategory = (turbineSnap.docs.first.data()['wtg_category'] ?? 'old').toString();
+        }
+      } catch (_) {}
 
       // Fetch live NCs for this audit
       final Map<String, Map<String, dynamic>> liveNCs = await _fetchNCsForAudit(auditId);
@@ -1453,9 +1595,21 @@ class ExcelExportService {
         final String ncCategory  = (nc?['nc_category']    ?? task['nc_category'] ?? '').toString();
         final String rootCause   = (nc?['root_cause']     ?? task['root_cause']  ?? '').toString();
         final String actionPlan  = (nc?['action_plan']    ?? task['action_plan'] ?? '').toString();
-        final String actionTaken = (nc?['action_taken']   ?? task['closure_remark'] ?? (isCorrected ? 'Corrected' : '')).toString();
-        final String ncStatus    = (nc?['status']         ?? (isCorrected ? 'Close' : 'Open')).toString();
-        final String remarks     = (nc?['remarks']        ?? task['closure_remark'] ?? '').toString();
+
+        // Custom logic for OSC
+        final String actionTaken = (isCorrected 
+            ? (task['closure_remark'] ?? 'OSC Corrected')
+            : (nc?['action_taken'] ?? task['closure_remark'] ?? '')).toString();
+        
+        final String ncStatus = (isCorrected ? 'OSC Close' : (nc?['status'] ?? 'Open')).toString();
+
+        // Rating Category
+        int rating = 1;
+        if (criticality == 'CF') {
+          rating = 3;
+        } else if (criticality == 'MCF') {
+          rating = 2;
+        }
 
         // Date Parsing
         String planDate = '';
@@ -1472,45 +1626,54 @@ class ExcelExportService {
           if (d != null) closingDateStr = DateFormat('dd-MM-yyyy').format(d);
         }
 
+        // Days Taken calculation
+        int daysTaken = 0;
+        if (closeVal != null && auditDate != null) {
+          final dClose = _parseDate(closeVal);
+          if (dClose != null) {
+            daysTaken = dClose.difference(auditDate).inDays;
+            if (daysTaken < 0) daysTaken = 0;
+          }
+        }
+
         final penalties = _calculatePenalties(criticality, ncCategory, workmanPenaltyMap);
         totalWorkmanPenalty += penalties['workman']!;
         totalOverallPenalty += penalties['overall']!;
         if (penalties['overall']! >= 3 || criticality == 'CF') criticalNCCount++;
 
+        // Write row (27 columns)
         _writeExcelRow(sheet1, sheet1Row, <String>[
           sheet1SrNo.toString(),
-          auditDateStr,
+          fy,
+          wtgCategory,
           turbineNo,
-          (nc?['reference_name'] ?? task['reference_name'] ?? '-').toString(),
+          auditDateStr,
+          turbineMake,
+          turbineModel,
+          turbineRating,
+          siteName,
+          district,
+          state,
+          zone,
+          warehouseCode,
+          customerName,
           (task['main_category_name'] ?? '-').toString(),
           (task['sub_category_name'] ?? '-').toString(),
           (nc?['finding'] ?? task['observation'] ?? '-').toString(),
-          '', // Finding Photos placeholder
           criticality,
-          ncCategory,
+          rating.toString(),
           rootCause,
           planDate,
           actionPlan,
-          actionTaken,
           closingDateStr,
-          '', // Closing Evidence
+          actionTaken,
           ncStatus,
-          remarks,
+          daysTaken.toString(),
+          auditorName,
         ]);
 
-        // Multiple Finding Photos
-        final List<dynamic> findingPhotos = (nc != null && nc['photos'] is List) ? nc['photos'] as List<dynamic> : (task['photos'] is List ? task['photos'] as List<dynamic> : <dynamic>[]);
-        if (findingPhotos.isNotEmpty) {
-          await _embedImages(sheet1, sheet1Row, 8, findingPhotos);
-        }
-
-        // Closure Evidence
-        final String? closurePhoto = nc?['closure_photo']?.toString() ?? task['closure_photo']?.toString();
-        if (closurePhoto != null && closurePhoto.isNotEmpty) {
-          await _embedSingleImage(sheet1, sheet1Row, 16, closurePhoto);
-        }
-
-        sheet1.getRangeByIndex(sheet1Row, 7).cellStyle.fontColor = _getFontColorForStatus(criticality);
+        // Apply conditional coloring to Observation cell (Column 17)
+        sheet1.getRangeByIndex(sheet1Row, 17).cellStyle.fontColor = _getFontColorForStatus(criticality);
         sheet1SrNo++;
         sheet1Row++;
       }
@@ -1543,17 +1706,39 @@ class ExcelExportService {
 
       String fmtD(DateTime? d) => d != null ? DateFormat('dd-MM-yyyy').format(d) : '';
 
+      // Write row (31 columns)
       _writeExcelRow(sheet2, sheet2Row, <String>[
-        sheet2SrNo.toString(), turbineNo, auditDateStr, turbineMake, turbineModel,
-        turbineRating, siteName, district, state, zone,
-        warehouseCode, customerName,
-        fmtD(commissioningDate), fmtD(takeOverDate),
-        _getAssessmentLabel(overallScore), '${overallCompliance.toStringAsFixed(2)}%',
-        _getAssessmentLabel(workmanScore), '${workmanCompliance.toStringAsFixed(2)}%',
+        sheet2SrNo.toString(),
+        fy,
+        wtgCategory.toLowerCase() == 'new' ? 'New' : 'Existing',
+        turbineNo,
+        auditDateStr,
+        turbineMake,
+        turbineModel,
+        turbineRating,
+        siteName,
+        district,
+        state,
+        zone,
+        warehouseCode,
+        customerName,
+        fmtD(commissioningDate),
+        fmtD(takeOverDate),
+        overallScore.toStringAsFixed(1),
+        '${overallCompliance.toStringAsFixed(2)}%',
+        workmanScore.toStringAsFixed(1),
+        '${workmanCompliance.toStringAsFixed(2)}%',
         criticalNCCount.toString(),
-        fmtD(pmPlanDate), fmtD(pmDoneDate),
-        pmAdherence, pmVsQaAging.toString(),
-        pmType, pmLead, pmMembers, 'Open', '',
+        fmtD(pmPlanDate),
+        fmtD(pmDoneDate),
+        pmAdherence,
+        pmVsQaAging.toString(),
+        pmType,
+        pmLead,
+        pmMembers,
+        'Open',
+        auditorName,
+        '',
       ]);
       sheet2Row++;
       sheet2SrNo++;
@@ -1577,10 +1762,12 @@ class ExcelExportService {
   /// If Date is Oct 2025, FY is 2025.
   /// If Date is Feb 2025, FY is 2024.
   String _getFinancialYear(DateTime date) {
-    if (date.month >= 4) {
-      return date.year.toString();
+    final int year = date.year;
+    final int month = date.month;
+    if (month >= 4) {
+      return '$year-${(year + 1).toString().substring(2)}';
     } else {
-      return (date.year - 1).toString();
+      return '${year - 1}-${year.toString().substring(2)}';
     }
   }
 
@@ -1591,7 +1778,7 @@ class ExcelExportService {
   Future<int> _getAuditSequenceCount(String siteName, DateTime date) async {
     try {
       // Calculate FY Start and End for the given date
-      int fyStartYear = date.month >= 4 ? date.year : date.year - 1;
+      final int fyStartYear = date.month >= 4 ? date.year : date.year - 1;
       final fyStartDate = DateTime(fyStartYear, 4, 1);
       final fyEndDate = DateTime(fyStartYear + 1, 3, 31, 23, 59, 59);
 
@@ -1630,8 +1817,8 @@ class ExcelExportService {
 
   /// Embeds multiple images side-by-side in a single row/column area.
   Future<void> _embedImages(Worksheet sheet, int row, int col, List<dynamic> imageUrls) async {
-    const int photoWidth = 60;
-    const int photoHeight = 60;
+    const int photoWidth = 143;  // 3.78 cm approx 143px
+    const int photoHeight = 80; // 2.12 cm approx 80px
 
     for (final url in imageUrls.take(3)) { // Limit to 3 to prevent extreme row height/width
       try {
@@ -1654,7 +1841,7 @@ class ExcelExportService {
           
           // picture.left = (col - 1) * colWidth + leftOffset; // Pseudo-code if we knew column widths
           
-          sheet.setRowHeightInPixels(row, photoHeight + 10);
+          sheet.setRowHeightInPixels(row, photoHeight + 15);
         }
       } catch (_) {}
     }
@@ -1667,10 +1854,10 @@ class ExcelExportService {
       final response = await http.get(Uri.parse(imageUrl));
       if (response.statusCode == 200) {
         final Picture picture = sheet.pictures.addStream(row, col, response.bodyBytes);
-        picture.height = 70;
-        picture.width = 70;
-        sheet.setRowHeightInPixels(row, 80);
-        sheet.setColumnWidthInPixels(col, 80);
+        picture.height = 80;
+        picture.width = 143;
+        sheet.setRowHeightInPixels(row, 90);
+        sheet.setColumnWidthInPixels(col, 150);
       }
     } catch (_) {}
   }

@@ -45,11 +45,11 @@ class _AnalyticsSectionState extends State<AnalyticsSection> {
         'correction': 0,
       };
 
-      for (var doc in snapshot.docs) {
+      for (final doc in snapshot.docs) {
         final data = doc.data();
         
         // Process Status Distribution
-        String status = (data['status'] ?? '').toString().toLowerCase();
+        final String status = (data['status'] ?? '').toString().toLowerCase();
         if (status == 'approved') {
           statusCounts['approved'] = (statusCounts['approved'] ?? 0) + 1;
         } else if (status.contains('pending')) {
@@ -179,7 +179,7 @@ class _AnalyticsSectionState extends State<AnalyticsSection> {
                                   touchTooltipData: BarTouchTooltipData(
                                     getTooltipColor: (group) => Colors.blueGrey.shade900,
                                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                                      String site = _siteCompliance.keys.elementAt(group.x.toInt());
+                                      final String site = _siteCompliance.keys.elementAt(group.x.toInt());
                                       return BarTooltipItem(
                                         '$site\n',
                                         const TextStyle(

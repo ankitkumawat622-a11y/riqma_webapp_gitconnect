@@ -22,7 +22,8 @@ class _TurbinesViewState extends State<TurbinesView> {
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-   Map<String, String> _siteToStateMap = {};
+  Map<String, String> _siteToStateMap = {};
+  bool _filterNewOnly = false;
   
   // Data State
   StreamSubscription<QuerySnapshot>? _dataSubscription;
@@ -76,7 +77,7 @@ class _TurbinesViewState extends State<TurbinesView> {
   Future<void> _fetchSiteStateMapping() async {
     final sitesSnapshot = await FirebaseFirestore.instance.collection('sites').get();
     final Map<String, String> mapping = {};
-    for (var doc in sitesSnapshot.docs) {
+    for (final doc in sitesSnapshot.docs) {
       final data = doc.data();
       final siteName = (data['site_name'] ?? data['name'] ?? '').toString();
       final stateName = (data['state_name'] ?? 'Unknown').toString();
@@ -121,6 +122,7 @@ class _TurbinesViewState extends State<TurbinesView> {
             'name': PlutoCell(value: (data.containsKey('turbine_name') ? data['turbine_name'] : (data.containsKey('name') ? data['name'] : 'Unknown')).toString()),
             'site': PlutoCell(value: (data.containsKey('site_name') ? data['site_name'] : 'N/A').toString()),
             'model': PlutoCell(value: (data.containsKey('model_name') ? data['model_name'] : 'N/A').toString()),
+            'wtg_category': PlutoCell(value: (data['wtg_category'] ?? 'old').toString()),
             'actions': PlutoCell(value: ''),
             'id': PlutoCell(value: doc.id),
           },
@@ -163,7 +165,7 @@ class _TurbinesViewState extends State<TurbinesView> {
                   }
                   final sites = snapshot.data!.docs;
                   final Map<String, String> siteMap = {
-                    for (var doc in sites)
+                    for (final doc in sites)
                       doc.id: (doc.data() as Map<String, dynamic>).containsKey('site_name') 
                           ? (doc.data() as Map<String, dynamic>)['site_name'].toString() 
                           : ((doc.data() as Map<String, dynamic>).containsKey('name') 
@@ -199,7 +201,7 @@ class _TurbinesViewState extends State<TurbinesView> {
                   }
                   final models = snapshot.data!.docs;
                     final Map<String, String> modelMap = {
-                      for (var doc in models)
+                      for (final doc in models)
                         doc.id: (doc.data() as Map<String, dynamic>).containsKey('turbine_model') 
                             ? (doc.data() as Map<String, dynamic>)['turbine_model'].toString() 
                             : ((doc.data() as Map<String, dynamic>).containsKey('name') 
@@ -263,7 +265,7 @@ class _TurbinesViewState extends State<TurbinesView> {
     ));
   }
 
-  void _editItem(String? docId) async {
+  Future<void> _editItem(String? docId) async {
     if (docId == null) {
       return;
     }
@@ -334,7 +336,7 @@ class _TurbinesViewState extends State<TurbinesView> {
                     }
                     final sites = snapshot.data!.docs;
                     final Map<String, String> siteMap = {
-                      for (var doc in sites)
+                      for (final doc in sites)
                         doc.id: (doc.data() as Map<String, dynamic>).containsKey('site_name') 
                             ? (doc.data() as Map<String, dynamic>)['site_name'].toString() 
                             : ((doc.data() as Map<String, dynamic>).containsKey('name') 
@@ -370,7 +372,7 @@ class _TurbinesViewState extends State<TurbinesView> {
                     }
                     final models = snapshot.data!.docs;
                     final Map<String, String> modelMap = {
-                      for (var doc in models)
+                      for (final doc in models)
                         doc.id: (doc.data() as Map<String, dynamic>).containsKey('turbine_model') 
                             ? (doc.data() as Map<String, dynamic>)['turbine_model'].toString() 
                             : ((doc.data() as Map<String, dynamic>).containsKey('name') 
@@ -471,6 +473,39 @@ class _TurbinesViewState extends State<TurbinesView> {
     ));
   }
 
+  Future<void> _updateWTGCategory(String docId, String category) async {
+    try {
+      await FirebaseFirestore.instance.collection('turbinename').doc(docId).update({
+        'wtg_category': category,
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _masterToggleWTGCategory(bool isNew, List<Map<String, dynamic>> visibleTurbines) async {
+    final String category = isNew ? 'new' : 'old';
+    final batch = FirebaseFirestore.instance.batch();
+    
+    for (final t in visibleTurbines) {
+      final docRef = FirebaseFirestore.instance.collection('turbinename').doc(t['id']?.toString());
+      batch.update(docRef, {'wtg_category': category});
+    }
+    
+    try {
+      await batch.commit();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('All turbines updated to $category')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Filter and Search rows
@@ -499,13 +534,21 @@ class _TurbinesViewState extends State<TurbinesView> {
         return name.contains(q) || site.contains(q) || model.contains(q);
       }).toList();
     }
+
+    // 4. WTG Category Filter
+    if (_filterNewOnly) {
+      filteredRows = filteredRows.where((PlutoRow r) => r.cells['wtg_category']?.value.toString() == 'new').toList();
+    }
     
     final turbinesList = filteredRows.map((PlutoRow r) => {
       'id': r.cells['id']?.value ?? '',
       'name': r.cells['name']?.value ?? 'Unknown',
       'model': r.cells['model']?.value ?? 'N/A',
       'site': r.cells['site']?.value ?? 'N/A',
+      'wtg_category': r.cells['wtg_category']?.value ?? 'old',
     }).toList();
+
+    final int newTurbineCount = rows.where((r) => r.cells['wtg_category']?.value == 'new').length;
 
     return Container(
       margin: const EdgeInsets.all(8),
@@ -572,6 +615,33 @@ class _TurbinesViewState extends State<TurbinesView> {
                 ),
                 Row(
                   children: [
+                    InkWell(
+                      onTap: () => setState(() => _filterNewOnly = !_filterNewOnly),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _filterNewOnly ? Colors.orange.shade50 : Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: _filterNewOnly ? Colors.orange.shade200 : Colors.grey.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.new_releases_rounded, size: 16, color: _filterNewOnly ? Colors.orange : Colors.grey.shade600),
+                            const SizedBox(width: 6),
+                            Text(
+                              '$newTurbineCount New',
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _filterNewOnly ? Colors.orange.shade800 : Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     OutlinedButton.icon(
                       onPressed: () => Navigator.push(
                         context,
@@ -729,9 +799,27 @@ class _TurbinesViewState extends State<TurbinesView> {
             decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.grey.shade200, width: 1))),
             child: Row(
               children: [
-                Expanded(flex: 2, child: Text('TURBINE NAME', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade500, letterSpacing: 0.5))),
+                Expanded(flex: 3, child: Text('TURBINE NAME', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade500, letterSpacing: 0.5))),
                 Expanded(flex: 2, child: Text('MODEL', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade500, letterSpacing: 0.5))),
-                Expanded(flex: 2, child: Text('SITE', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade500, letterSpacing: 0.5))),
+                Expanded(flex: 3, child: Text('SITE', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade500, letterSpacing: 0.5))),
+                SizedBox(
+                  width: 120,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('CATEGORY', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade500, letterSpacing: 0.5)),
+                      const SizedBox(width: 4),
+                      Transform.scale(
+                        scale: 0.6,
+                        child: Switch(
+                          value: turbinesList.isNotEmpty && turbinesList.every((t) => t['wtg_category'] == 'new'),
+                          onChanged: (val) => _masterToggleWTGCategory(val, turbinesList),
+                          activeThumbColor: Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 SizedBox(width: 100, child: Text('ACTIONS', textAlign: TextAlign.center, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade500, letterSpacing: 0.5))),
               ],
             ),
@@ -763,7 +851,7 @@ class _TurbinesViewState extends State<TurbinesView> {
                                  Expanded(flex: 2, child: Text(name, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500, color: const Color(0xFF1A1F36)))),
                                  Expanded(flex: 2, child: Text(turbine['model']?.toString() ?? 'N/A', style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey.shade600))),
                                  Expanded(
-                                   flex: 2,
+                                   flex: 3,
                                    child: Row(
                                      children: [
                                        Icon(Icons.location_on_outlined, size: 16, color: Colors.grey.shade500),
@@ -772,6 +860,33 @@ class _TurbinesViewState extends State<TurbinesView> {
                                      ],
                                    ),
                                  ),
+                                SizedBox(
+                                  width: 120,
+                                  child: Center(
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          (turbine['wtg_category'] ?? 'old').toString().toUpperCase(),
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: turbine['wtg_category'] == 'new' ? Colors.orange : Colors.grey,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Transform.scale(
+                                          scale: 0.7,
+                                          child: Switch(
+                                            value: turbine['wtg_category'] == 'new',
+                                            onChanged: (val) => _updateWTGCategory(turbine['id']?.toString() ?? '', val ? 'new' : 'old'),
+                                            activeThumbColor: Colors.orange,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                                 SizedBox(
                                   width: 100,
                                   child: Row(

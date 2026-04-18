@@ -184,7 +184,7 @@ class _MainCategoriesViewState extends State<MainCategoriesView> {
   // Add Dialog
   // ---------------------------------------------------------------------------
 
-  void _addItem() async {
+  Future<void> _addItem() async {
     final nameController = TextEditingController();
     final sortOrderController = TextEditingController(text: '0');
     final totalQuestionsController = TextEditingController(text: '0');
@@ -228,7 +228,7 @@ class _MainCategoriesViewState extends State<MainCategoriesView> {
                         }
                         final modelDocs = snapshot.data!.docs;
                         final Map<String, String> modelMap = {
-                          for (var doc in modelDocs)
+                          for (final doc in modelDocs)
                             doc.id: _modelName(
                                 doc.data() as Map<String, dynamic>),
                         };
@@ -384,7 +384,7 @@ class _MainCategoriesViewState extends State<MainCategoriesView> {
   // Edit Dialog
   // ---------------------------------------------------------------------------
 
-  void _editItem(String? docId) async {
+  Future<void> _editItem(String? docId) async {
     if (docId == null) return;
     try {
       final doc = await FirebaseFirestore.instance
@@ -436,7 +436,7 @@ class _MainCategoriesViewState extends State<MainCategoriesView> {
                         }
                         final modelDocs = snapshot.data!.docs;
                         final Map<String, String> modelMap = {
-                          for (var d in modelDocs)
+                          for (final d in modelDocs)
                             d.id: _modelName(
                                 d.data() as Map<String, dynamic>),
                         };

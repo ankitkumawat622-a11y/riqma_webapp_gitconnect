@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:riqma_webapp/auth_wrapper.dart';
 import 'package:riqma_webapp/firebase_options.dart';
 import 'package:riqma_webapp/services/theme_service.dart';
+import 'package:riqma_webapp/services/toast_service.dart';
 
 
 void main() async {
@@ -23,6 +24,7 @@ class MyApp extends StatelessWidget {
       listenable: ThemeService.instance,
       builder: (context, child) {
         return MaterialApp(
+          navigatorKey: ToastService.navigatorKey,
           title: 'RIQMA - Renom Integrated Quality Management',
           themeMode: ThemeService.instance.themeMode,
           theme: ThemeData(

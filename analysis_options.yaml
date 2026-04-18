@@ -68,3 +68,21 @@ linter:
     - prefer_const_literals_to_create_immutables
     - sort_child_properties_last
     - unnecessary_await_in_return
+    - avoid_print
+    - prefer_final_locals
+    - prefer_single_quotes
+    - unnecessary_parenthesis
+    - use_key_in_widget_constructors
+    - avoid_unnecessary_containers
+    - sized_box_for_whitespace
+    - avoid_void_async
+    - await_only_futures
+    - empty_constructor_bodies
+    - library_names
+    - library_prefixes
+    - prefer_const_constructors_in_immutables
+    - prefer_const_declarations
+    - prefer_final_in_for_each
+    - type_annotate_public_apis
+    - unnecessary_string_interpolations
+    - use_full_hex_values_for_flutter_colors

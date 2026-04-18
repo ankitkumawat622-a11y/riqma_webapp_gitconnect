@@ -33,7 +33,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
     super.dispose();
   }
 
-  void _approvePlan(String docId) async {
+  Future<void> _approvePlan(String docId) async {
     try {
       await FirebaseFirestore.instance
           .collection('planning_data')
@@ -55,7 +55,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
     }
   }
 
-  void _rejectPlan(String docId) async {
+  Future<void> _rejectPlan(String docId) async {
     // Show Confirmation Dialog
     final confirm = await showDialog<bool>(
       context: context,
@@ -124,7 +124,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
           final Set<String> uniqueStates = {};
           final Set<String> uniqueSites = {};
 
-          for (var doc in allDocs) {
+          for (final doc in allDocs) {
             final data = doc.data() as Map<String, dynamic>;
             if (data['state'] != null) {
               uniqueStates.add(data['state'].toString());
@@ -144,7 +144,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
           final List<String> sitesList = ['All Sites', ...uniqueSites]..sort();
 
           // Filter Logic
-          var filteredDocs = allDocs.where((doc) {
+          final filteredDocs = allDocs.where((doc) {
             final data = doc.data() as Map<String, dynamic>;
             
             // Search Query
@@ -242,7 +242,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
                         value: _selectedMonth != 'All Months' ? _selectedMonth : null, // Handle 'All' logic
                         items: {
                           'All Months': 'All Months',
-                          for (var m in _months) m: m,
+                          for (final m in _months) m: m,
                         },
                         color: Colors.blue,
                         icon: Icons.calendar_today_rounded,
@@ -257,7 +257,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
                         label: 'State',
                         value: _selectedState != 'All States' ? _selectedState : null,
                         items: {
-                          for (var s in statesList) s: s,
+                          for (final s in statesList) s: s,
                         },
                         color: Colors.orange,
                         icon: Icons.map_rounded,
@@ -277,7 +277,7 @@ class _PlanningScreenState extends State<PlanningScreen> {
                         label: 'Site',
                         value: _selectedSite != 'All Sites' ? _selectedSite : null,
                         items: {
-                           for (var s in sitesList) s: s,
+                           for (final s in sitesList) s: s,
                         },
                         color: Colors.green,
                         icon: Icons.location_on_rounded,
@@ -398,8 +398,8 @@ class _PlanningScreenState extends State<PlanningScreen> {
 
     // Logic to determine the Main Display Title
     String displayTitle;
-    var turbines = data['turbines']; // Check for list of turbines
-    var singleId = data['turbine_id'] ?? data['turbineId']; // Check for single ID
+    final turbines = data['turbines']; // Check for list of turbines
+    final singleId = data['turbine_id'] ?? data['turbineId']; // Check for single ID
     if (singleId != null && singleId.toString().isNotEmpty) {
       // Case 1: Specific Turbine ID exists
       displayTitle = singleId.toString();
@@ -413,8 +413,8 @@ class _PlanningScreenState extends State<PlanningScreen> {
     } else {
       // Case 3 (Fallback): No specific ID found (Generic Plan)
       // Construct a title from Site and Model: e.g., "Kukru - G97"
-      String site = (data['site_name'] ?? data['site'] ?? 'Unknown Site').toString();
-      String model = (data['turbine_model'] ?? data['model'] ?? '').toString();
+      final String site = (data['site_name'] ?? data['site'] ?? 'Unknown Site').toString();
+      final String model = (data['turbine_model'] ?? data['model'] ?? '').toString();
       displayTitle = model.isNotEmpty ? '$site / $model' : site;
     }
 

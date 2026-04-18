@@ -142,7 +142,7 @@ class _DigitalSqaReportScreenState extends State<DigitalSqaReportScreen> {
     final tasks = widget.auditData['audit_data'] as Map<String, dynamic>? ?? {};
     
     // Fetch reference codes from Firestore for sorting
-    Map<String, int> referenceCodeMap = {};
+    final Map<String, int> referenceCodeMap = {};
     try {
       final refsSnapshot = await FirebaseFirestore.instance.collection('references').get();
       for (final doc in refsSnapshot.docs) {
@@ -617,8 +617,8 @@ class _DigitalSqaReportScreenState extends State<DigitalSqaReportScreen> {
   // ==================== PDF MAINTENANCE SECTION (REFACTORED) ====================
   pw.Widget _buildPdfMaintenanceSection() {
     // Extract data
-    String assessmentStage = widget.auditData['assessment_stage']?.toString() ?? '';
-    String maintenanceType = widget.auditData['maintenance_type']?.toString() ?? '';
+    final String assessmentStage = widget.auditData['assessment_stage']?.toString() ?? '';
+    final String maintenanceType = widget.auditData['maintenance_type']?.toString() ?? '';
 
     final maintPlanStr = _maintPlanDate != null ? DateFormat('dd/MM/yyyy').format(_maintPlanDate!) : '-';
     final maintDoneStr = _maintDoneDate != null ? DateFormat('dd/MM/yyyy').format(_maintDoneDate!) : '-';
@@ -672,9 +672,9 @@ class _DigitalSqaReportScreenState extends State<DigitalSqaReportScreen> {
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        _buildPdfDynamicOption("Before Maintenance", assessmentStage),
-                        _buildPdfDynamicOption("During Maintenance", assessmentStage),
-                        _buildPdfDynamicOption("After Maintenance", assessmentStage),
+                        _buildPdfDynamicOption('Before Maintenance', assessmentStage),
+                        _buildPdfDynamicOption('During Maintenance', assessmentStage),
+                        _buildPdfDynamicOption('After Maintenance', assessmentStage),
 
                       ],
                     ),
@@ -688,10 +688,10 @@ class _DigitalSqaReportScreenState extends State<DigitalSqaReportScreen> {
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        _buildPdfDynamicOption("Electrical Maintenance Yearly", maintenanceType),
-                        _buildPdfDynamicOption("Mechanical Maintenance Yearly", maintenanceType),
-                        _buildPdfDynamicOption("Half Yearly Maintenance", maintenanceType),
-                        _buildPdfDynamicOption("Visual And Grease Maintenance", maintenanceType),
+                        _buildPdfDynamicOption('Electrical Maintenance Yearly', maintenanceType),
+                        _buildPdfDynamicOption('Mechanical Maintenance Yearly', maintenanceType),
+                        _buildPdfDynamicOption('Half Yearly Maintenance', maintenanceType),
+                        _buildPdfDynamicOption('Visual And Grease Maintenance', maintenanceType),
                       ],
                     ),
                   ),
@@ -767,7 +767,7 @@ class _DigitalSqaReportScreenState extends State<DigitalSqaReportScreen> {
 
   pw.Widget _buildPdfDynamicOption(String label, String? databaseValue) {
     // Normalize strings
-    bool isSelected = (databaseValue ?? '').trim().toLowerCase() == label.trim().toLowerCase();
+    final bool isSelected = (databaseValue ?? '').trim().toLowerCase() == label.trim().toLowerCase();
     
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 2.0),
@@ -1309,7 +1309,7 @@ class _DigitalSqaReportScreenState extends State<DigitalSqaReportScreen> {
 
   Widget _buildDynamicOption(String label, String? databaseValue) {
     // Normalize strings to ensure robust matching (ignore case and spaces)
-    bool isSelected = (databaseValue ?? '').trim().toLowerCase() == label.trim().toLowerCase();
+    final bool isSelected = (databaseValue ?? '').trim().toLowerCase() == label.trim().toLowerCase();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.0),
       child: Row(
@@ -1342,8 +1342,8 @@ class _DigitalSqaReportScreenState extends State<DigitalSqaReportScreen> {
 
   // ==================== MAINTENANCE SECTION (REFACTORED) ====================
   Widget _buildMaintenanceSection() {
-    String assessmentStage = widget.auditData['assessment_stage']?.toString() ?? '';
-    String maintenanceType = widget.auditData['maintenance_type']?.toString() ?? '';
+    final String assessmentStage = widget.auditData['assessment_stage']?.toString() ?? '';
+    final String maintenanceType = widget.auditData['maintenance_type']?.toString() ?? '';
 
     return Table(
       border: TableBorder.all(color: Colors.black, width: 0.5),
@@ -1389,9 +1389,9 @@ class _DigitalSqaReportScreenState extends State<DigitalSqaReportScreen> {
                      child: Column(
                        crossAxisAlignment: CrossAxisAlignment.start,
                        children: [
-                         _buildDynamicOption("Before Maintenance", assessmentStage),
-                         _buildDynamicOption("During Maintenance", assessmentStage),
-                         _buildDynamicOption("After Maintenance", assessmentStage),
+                         _buildDynamicOption('Before Maintenance', assessmentStage),
+                         _buildDynamicOption('During Maintenance', assessmentStage),
+                         _buildDynamicOption('After Maintenance', assessmentStage),
                        ],
                      ),
                    ),
@@ -1404,10 +1404,10 @@ class _DigitalSqaReportScreenState extends State<DigitalSqaReportScreen> {
                      child: Column(
                        crossAxisAlignment: CrossAxisAlignment.start,
                        children: [
-                         _buildDynamicOption("Electrical Maintenance Yearly", maintenanceType),
-                         _buildDynamicOption("Mechanical Maintenance Yearly", maintenanceType),
-                         _buildDynamicOption("Half Yearly Maintenance", maintenanceType),
-                         _buildDynamicOption("Visual And Grease Maintenance", maintenanceType),
+                         _buildDynamicOption('Electrical Maintenance Yearly', maintenanceType),
+                         _buildDynamicOption('Mechanical Maintenance Yearly', maintenanceType),
+                         _buildDynamicOption('Half Yearly Maintenance', maintenanceType),
+                         _buildDynamicOption('Visual And Grease Maintenance', maintenanceType),
                        ],
                      ),
                    ),

@@ -219,7 +219,7 @@ class _AuditReportsScreenState extends State<AuditReportsScreen> {
           ? DateFormat('dd/MM/yyyy').format(timestamp.toDate())
           : '';
 
-      String status = (data['status'] ?? 'pending').toString();
+      final String status = (data['status'] ?? 'pending').toString();
 
       newRows.add(PlutoRow(
         cells: {

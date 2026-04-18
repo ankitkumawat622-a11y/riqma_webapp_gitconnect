@@ -261,7 +261,7 @@ class _TasksViewState extends State<TasksView> {
     });
   }
 
-  void _addItem({String? activeFilterSubCatId, String? activeFilterModelId}) async {
+  Future<void> _addItem({String? activeFilterSubCatId, String? activeFilterModelId}) async {
     final titleController = TextEditingController();
     final descriptionController = TextEditingController();
     final sortOrderController = TextEditingController(text: '0');
@@ -377,7 +377,7 @@ class _TasksViewState extends State<TasksView> {
     );
   }
 
-  void _editItem(String? docId) async {
+  Future<void> _editItem(String? docId) async {
     if (docId == null) return;
     try {
       final doc = await FirebaseFirestore.instance.collection('tasks').doc(docId).get();
@@ -642,7 +642,7 @@ class _TasksViewState extends State<TasksView> {
                               builder: (context, snapshot) {
                                 if (!snapshot.hasData) return const LinearProgressIndicator();
                                 final items = {
-                                  for (var doc in snapshot.data!.docs)
+                                  for (final doc in snapshot.data!.docs)
                                     doc.id: (doc.data() as Map<String, dynamic>).containsKey('turbine_model')
                                         ? (doc.data() as Map<String, dynamic>)['turbine_model'].toString()
                                         : (doc.data() as Map<String, dynamic>)['name']?.toString() ?? 'Unknown',
@@ -684,7 +684,7 @@ class _TasksViewState extends State<TasksView> {
                                   return false;
                                 });
                                 final items = {
-                                  for (var doc in docs)
+                                  for (final doc in docs)
                                     doc.id: (doc.data() as Map<String, dynamic>)['name']?.toString() ?? 'Unknown',
                                 };
                                 return ModernSearchableDropdown(
@@ -731,7 +731,7 @@ class _TasksViewState extends State<TasksView> {
                                 });
                               }
                               final items = {
-                                for (var doc in docs)
+                                for (final doc in docs)
                                   doc.id: (doc.data() as Map<String, dynamic>)['name']?.toString() ?? 'Unknown',
                               };
                               return ModernSearchableDropdown(
@@ -766,7 +766,7 @@ class _TasksViewState extends State<TasksView> {
                             builder: (context, snapshot) {
                               if (!snapshot.hasData) return const SizedBox();
                               final items = {
-                                for (var doc in snapshot.data!.docs)
+                                for (final doc in snapshot.data!.docs)
                                   doc.id: (doc.data() as Map<String, dynamic>)['name']?.toString() ?? 'Unknown',
                               };
                               return ModernSearchableDropdown(
@@ -1448,7 +1448,7 @@ class _RichTextToolbarState extends State<_RichTextToolbar> {
                 child: ModernSearchableDropdown(
                   label: 'Size',
                   value: _fontSizes.contains(s.fontSize) ? s.fontSize.toString() : '14.0',
-                  items: {for (var fs in _fontSizes) fs.toString(): '${fs.toInt()}px'},
+                  items: {for (final fs in _fontSizes) fs.toString(): '${fs.toInt()}px'},
                   color: Colors.grey,
                   icon: Icons.format_size_rounded,
                   onChanged: (v) {
@@ -1466,7 +1466,7 @@ class _RichTextToolbarState extends State<_RichTextToolbar> {
                 child: ModernSearchableDropdown(
                   label: 'Font',
                   value: _fonts.contains(s.fontFamily) ? s.fontFamily : 'Outfit',
-                  items: {for (var f in _fonts) f: f},
+                  items: {for (final f in _fonts) f: f},
                   color: Colors.grey,
                   icon: Icons.font_download_rounded,
                   onChanged: (v) {

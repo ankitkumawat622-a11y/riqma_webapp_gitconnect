@@ -409,7 +409,7 @@ class _BulkTaskEntryScreenState extends State<BulkTaskEntryScreen> {
   //   );
   // }
 
-  void _showMultiModelPicker() async {
+  Future<void> _showMultiModelPicker() async {
     final result = await showDialog<Set<String>>(
       context: context,
       builder: (ctx) => _MultiModelPickerDialog(

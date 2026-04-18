@@ -282,7 +282,7 @@ class _MainLayoutState extends State<MainLayout> {
                                           value: _analyticsSelectedState != 'All States' ? _analyticsSelectedState : null,
                                           items: {
                                             'All States': 'All States',
-                                            for (var s in _analyticsAvailableStates) s: s,
+                                            for (final s in _analyticsAvailableStates) s: s,
                                           },
                                           color: Colors.blue,
                                           icon: Icons.map_rounded,
@@ -301,7 +301,7 @@ class _MainLayoutState extends State<MainLayout> {
                                           value: _analyticsSelectedSite != 'All Sites' ? _analyticsSelectedSite : null,
                                           items: {
                                             'All Sites': 'All Sites',
-                                            for (var s in sites) s: s,
+                                            for (final s in sites) s: s,
                                           },
                                           color: Colors.teal,
                                           icon: Icons.location_city_rounded,

@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:riqma_webapp/services/activity_log_service.dart';
+import 'package:riqma_webapp/services/toast_service.dart';
 import 'package:riqma_webapp/widgets/modern_searchable_dropdown.dart';
 
 class AuditorSelfReviewScreen extends StatefulWidget {
@@ -34,11 +35,11 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
   // Fetched Turbine Details
   String _fetchedMake = '';
   String _fetchedRating = '';
-  bool _isLoadingDetails = false;
+
 
   // Selection & Filter Tracking
   int _selectedTaskIndex = 0;
-  String _filterStatus = 'all'; // 'all' | 'OK' | 'Not OK'
+  String _filterStatus = 'Not OK'; // 'all' | 'OK' | 'Not OK'
   bool _isMetadataExpanded = true; // State for collapsible metadata
   List<AuditGroup> _processedGroups = []; // State for hierarchical data
   final Set<String> _collapsedCategories = {}; // tracks which main-cats are collapsed
@@ -120,7 +121,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
 
     // Reset task selection
     _selectedTaskIndex = 0;
-    _filterStatus = 'all';
+    _filterStatus = 'Not OK';
 
     _fetchReferences();
     _fetchAuditConfigs(); // Fetch dynamic NC categories & root causes
@@ -160,10 +161,10 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
     }
 
     if (modelId != null && modelId.isNotEmpty) {
-      if (mounted) setState(() => _isLoadingDetails = true);
+
       
       try {
-        var doc = await FirebaseFirestore.instance
+        final doc = await FirebaseFirestore.instance
             .collection('turbinemodel')
             .doc(modelId)
             .get();
@@ -186,9 +187,9 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
           });
         }
       } catch (e) {
-        debugPrint("Error fetching model details: $e");
+        debugPrint('Error fetching model details: $e');
       } finally {
-        if (mounted) setState(() => _isLoadingDetails = false);
+
       }
     }
   }
@@ -204,7 +205,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
       return a.key.compareTo(b.key);
     });
 
-    Map<String, AuditGroup> groups = {};
+    final Map<String, AuditGroup> groups = {};
 
     for (int i = 0; i < entries.length; i++) {
         final entry = entries[i];
@@ -213,7 +214,8 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
         final mainCat = task['main_category_name']?.toString() ?? 'Other';
         final subCat = task['sub_category_name']?.toString() ?? 'General';
         final status = task['status']?.toString();
-        final isOk = status == 'OK';
+        final isCorrected = task['is_corrected'] == true;
+        final isOk = status == 'OK' && !isCorrected;
 
         // Get or Create Main Group
         if (!groups.containsKey(mainCat)) {
@@ -238,7 +240,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
 
         // Add Task
         // Store original index to allow selection
-        Map<String, dynamic> taskData = Map.from(task);
+        final Map<String, dynamic> taskData = Map.from(task);
         taskData['original_index'] = i; 
         taskData['key'] = entry.key;
         subGroup.tasks.add(taskData);
@@ -276,6 +278,35 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
     }
   }
 
+  Widget _buildStatusToggleButton({
+    required String label,
+    required bool isSelected,
+    required MaterialColor activeColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor.withValues(alpha: 0.1) : Colors.transparent,
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.outfit(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              color: isSelected ? activeColor.shade700 : Colors.grey.shade600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showMasterRemarkHistory() {
     // Mark as seen if auditor opens history manually
     if (widget.auditData['auditor_remark_seen'] == false) {
@@ -287,62 +318,149 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
 
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.history_edu, color: Color(0xFF0D7377)),
-            const SizedBox(width: 8),
-            Text('Master Remark History', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: SizedBox(
-          width: 500,
-          height: 400,
-          child: _masterRemarks.isEmpty
-              ? Center(child: Text('No remarks recorded yet.', style: GoogleFonts.outfit()))
-              : ListView.separated(
-                  itemCount: _masterRemarks.length,
-                  separatorBuilder: (context, index) => const Divider(),
-                  itemBuilder: (context, index) {
-                    final remark = _masterRemarks[(_masterRemarks.length - 1) - index]; // Show latest first
-                    final isManager = remark['authorRole'] == 'manager';
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                '${remark['authorName']} (${remark['authorRole'].toString().toUpperCase()})',
-                                style: GoogleFonts.outfit(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                  color: isManager ? Colors.blue[700] : Colors.orange[700],
-                                ),
-                              ),
-                              Text(
-                                detailTimestamp(remark['timestamp']),
-                                style: GoogleFonts.outfit(fontSize: 10, color: Colors.grey),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(remark['remark'].toString(), style: GoogleFonts.outfit(fontSize: 13)),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close', style: GoogleFonts.outfit()),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: 550,
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
           ),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.history_edu_rounded, color: Colors.teal.shade700, size: 24),
+                  ),
+                  const SizedBox(width: 16),
+                  Text(
+                    'Remark History',
+                    style: GoogleFonts.outfit(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF1A1F36),
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                    style: IconButton.styleFrom(backgroundColor: Colors.grey.shade100),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Expanded(
+                child: _masterRemarks.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.notes_rounded, size: 48, color: Colors.grey[300]),
+                            const SizedBox(height: 12),
+                            Text('No remarks yet', style: GoogleFonts.outfit(color: Colors.grey[500])),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _masterRemarks.length,
+                        itemBuilder: (context, index) {
+                          final remark = _masterRemarks[(_masterRemarks.length - 1) - index];
+                          final isManager = remark['authorRole'] == 'manager';
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 20.0),
+                            child: IntrinsicHeight(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Column(
+                                    children: [
+                                      Container(
+                                        width: 12,
+                                        height: 12,
+                                        decoration: BoxDecoration(
+                                          color: isManager ? Colors.blue.shade400 : Colors.orange.shade400,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: Colors.white, width: 2),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: (isManager ? Colors.blue : Colors.orange).withValues(alpha: 0.3),
+                                              blurRadius: 4,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Container(
+                                          width: 2,
+                                          color: Colors.grey.shade200,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: isManager ? Colors.blue.shade50.withValues(alpha: 0.5) : Colors.orange.shade50.withValues(alpha: 0.5),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: isManager ? Colors.blue.shade100 : Colors.orange.shade100,
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                remark['authorName'].toString(),
+                                                style: GoogleFonts.outfit(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
+                                                  color: isManager ? Colors.blue.shade900 : Colors.orange.shade900,
+                                                ),
+                                              ),
+                                              Text(
+                                                detailTimestamp(remark['timestamp']),
+                                                style: GoogleFonts.outfit(fontSize: 11, color: Colors.grey[500]),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            remark['remark'].toString(),
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 14,
+                                              color: Colors.grey[800],
+                                              height: 1.4,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -377,45 +495,88 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
   void _showRemarkPopup(Map<String, dynamic> remarkData) {
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.feedback, color: Colors.orange),
-            const SizedBox(width: 8),
-            Text('Manager Feedback', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'A manager has requested corrections for this audit:',
-              style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[700]),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.orange[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.orange[200]!),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: 450,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
               ),
-              child: Text(
-                remarkData['remark'].toString(),
-                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Understood', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+            ],
           ),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.report_problem_rounded, color: Colors.orange.shade700, size: 32),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Manager Feedback',
+                style: GoogleFonts.outfit(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF1A1F36),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'A manager has requested corrections for this audit',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 24),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Text(
+                  remarkData['remark'].toString(),
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.outfit(
+                    fontSize: 15,
+                    color: Colors.grey[800],
+                    height: 1.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1A1F36),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    'Understood',
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -578,29 +739,19 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
       }
       Navigator.of(context).pop();
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Saved Successfully', style: GoogleFonts.outfit()), backgroundColor: Colors.green),
-      );
+      ToastService.success('Saved Successfully');
     } catch (e) {
       if (!mounted) {
         return;
       }
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving: $e', style: GoogleFonts.outfit()), backgroundColor: Colors.red),
-      );
+      ToastService.error('Error saving: $e');
     }
   }
 
-  /// Shows a red snackbar with the given error message
+  /// Shows a modern, centered error notification with a 30-second timer
   void _showValidationError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message, style: GoogleFonts.outfit()),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
-      ),
-    );
+    ToastService.error(message);
   }
 
   /// Validates all mandatory fields before submission
@@ -678,6 +829,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
       final status = task['status']?.toString().toLowerCase() ?? '';
       
       if (status == 'not ok') {
+        final isOSC = task['is_corrected'] == true;
         final String? refId = task['reference_id']?.toString() ?? task['ref_id']?.toString();
         final referenceName = _refIdToName[refId] ?? 
                              task['reference_name'] ?? 
@@ -695,8 +847,8 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
           }
         }
 
-        // 2. Action Plan Remark
-        if (_submissionRules['mandatory_action_plan'] == true) {
+        // 2. Action Plan Remark (Bypass for OSC)
+        if (!isOSC && _submissionRules['mandatory_action_plan'] == true) {
           final ap = task['action_plan']?.toString() ?? '';
           if (ap.isEmpty) {
             _showValidationError('Action Plan Remark is mandatory for: $errorPrefix');
@@ -713,8 +865,8 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
           }
         }
 
-        // 4. Plan Date (Target Date)
-        if (_submissionRules['mandatory_plan_date'] == true) {
+        // 4. Plan Date (Target Date) (Bypass for OSC)
+        if (!isOSC && _submissionRules['mandatory_plan_date'] == true) {
           final td = task['target_date'];
           if (td == null) {
             _showValidationError('Target Date (Plan Date) is mandatory for: $errorPrefix');
@@ -722,12 +874,16 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
           }
         }
 
-        // 5. PI Status (Requires Status AND PI Number)
+        // 5. PI Status (Requires Status AND PI Number ONLY IF "PI Already Raised")
         if (_submissionRules['mandatory_pi_status'] == true) {
           final ms = task['material_status']?.toString() ?? '';
           final pin = task['pi_number']?.toString() ?? '';
-          if (ms.isEmpty || pin.isEmpty) {
-             _showValidationError('Material Status and PI Number are both mandatory for: $errorPrefix');
+          if (ms.isEmpty) {
+             _showValidationError('Material Status is mandatory for: $errorPrefix');
+             return false;
+          }
+          if (ms == 'PI Already Raised' && pin.trim().isEmpty) {
+             _showValidationError('PI Number is mandatory for "PI Already Raised" status: $errorPrefix');
              return false;
           }
         }
@@ -752,7 +908,8 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
 
         // 8. Reference
         if (_submissionRules['mandatory_reference'] == true) {
-          if (refId == null || refId.isEmpty || refId == 'null') {
+          final String? refName = task['reference_name']?.toString();
+          if ((refId == null || refId.isEmpty || refId == 'null') && (refName == null || refName.isEmpty)) {
             _showValidationError('Reference selection is mandatory for: $errorPrefix');
             return false;
           }
@@ -861,9 +1018,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
       }
       Navigator.of(context).pop();
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Successfully submitted to manager', style: GoogleFonts.outfit()), backgroundColor: Colors.green),
-      );
+      ToastService.success('Successfully submitted to manager');
       Navigator.of(context).pop();
     } catch (e) {
       // Log Failure
@@ -880,9 +1035,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
         return;
       }
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error submitting: $e', style: GoogleFonts.outfit()), backgroundColor: Colors.red),
-      );
+      ToastService.error('Error submitting: $e');
     }
   }
 
@@ -1118,7 +1271,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
                         label: 'Root Cause',
                         value: rootCause,
                         items: {
-                          for (var s in _rootCauses) s['label']?.toString() ?? '': s['label']?.toString() ?? ''
+                          for (final s in _rootCauses) s['label']?.toString() ?? '': s['label']?.toString() ?? ''
                         },
                         color: Colors.amber,
                         icon: Icons.psychology_outlined,
@@ -1314,7 +1467,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
                               label: 'NC Category',
                               value: selectedCategory,
                               items: {
-                                for (var cat in _ncCategories) cat['name']?.toString() ?? '': cat['name']?.toString() ?? ''
+                                for (final cat in _ncCategories) cat['name']?.toString() ?? '': cat['name']?.toString() ?? ''
                               },
                               color: Colors.purple,
                               icon: Icons.category_outlined,
@@ -1426,7 +1579,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
                             label: 'Assessment Work Details',
                             value: tempStageId,
                             items: {
-                              for (var s in stagesRaw) s['id'].toString(): s['label'].toString()
+                              for (final s in stagesRaw) s['id'].toString(): s['label'].toString()
                             },
                             color: Colors.lightBlue,
                             icon: Icons.checklist_rtl_rounded,
@@ -1447,7 +1600,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
                             label: 'Type Of Maintenance',
                             value: tempTypeId,
                             items: {
-                              for (var t in typesRaw) t['id'].toString(): t['label'].toString()
+                              for (final t in typesRaw) t['id'].toString(): t['label'].toString()
                             },
                             color: Colors.indigo,
                             icon: Icons.precision_manufacturing_rounded,
@@ -1535,7 +1688,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
       members = List<String>.from(localAuditData['pm_team_members'] as Iterable<dynamic>);
     }
     
-    List<TextEditingController> memberControllers = members.map((m) => TextEditingController(text: m)).toList();
+    final List<TextEditingController> memberControllers = members.map((m) => TextEditingController(text: m)).toList();
     
     showDialog<void>(
       context: context,
@@ -1669,7 +1822,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
                   onPressed: () {
                     // Dispose controllers
                     leaderController.dispose();
-                    for (var c in memberControllers) {
+                    for (final c in memberControllers) {
                       c.dispose();
                     }
                     Navigator.pop(context);
@@ -1729,7 +1882,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
                     
                     // Dispose controllers
                     leaderController.dispose();
-                    for (var c in memberControllers) {
+                    for (final c in memberControllers) {
                       c.dispose();
                     }
                   },
@@ -1983,177 +2136,231 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
   }
 
   Widget _buildMetadataSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Collapsible Header
-        InkWell(
-          onTap: () => setState(() => _isMetadataExpanded = !_isMetadataExpanded),
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.teal.shade100, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.teal.shade900.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.precision_manufacturing_rounded, color: Colors.teal.shade700, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Audit Metadata',
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.teal.shade900,
+                ),
+              ),
+              const Spacer(),
+              InkWell(
+                onTap: () => setState(() => _isMetadataExpanded = !_isMetadataExpanded),
+                child: AnimatedRotation(
+                  turns: _isMetadataExpanded ? 0.0 : -0.25,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.teal.shade700),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          AnimatedCrossFade(
+            firstChild: Column(
               children: [
                 Row(
                   children: [
-                    Container(
-                      width: 4,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0D7377),
-                        borderRadius: BorderRadius.circular(2),
+                    Expanded(child: _buildMetadataItem('Turbine Make', _turbineMakeController.text, Icons.factory_rounded)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildMetadataItem('WTG Model', _wtgModelController.text, Icons.model_training_rounded)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(child: _buildMetadataItem('WTG Rating', _wtgRatingController.text, Icons.bolt_rounded)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildMetadataItem('Customer', _customerNameController.text, Icons.business_rounded)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ModernSearchableDropdown(
+                        label: 'Assessment Stage',
+                        value: _assessmentStage,
+                        items: const {
+                          'Commissioning': 'Commissioning',
+                          'Maintenance': 'Maintenance',
+                          'Major Component': 'Major Component',
+                          'RWP': 'RWP',
+                        },
+                        color: Colors.teal,
+                        icon: Icons.assignment_turned_in_rounded,
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _assessmentStage = val;
+                              localAuditData['assessment_stage'] = val;
+                            });
+                          }
+                        },
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Turbine Details',
-                      style: GoogleFonts.outfit(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF0D7377),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ModernSearchableDropdown(
+                        label: 'Maintenance Type',
+                        value: _maintenanceType,
+                        items: const {
+                          '500 Hr': '500 Hr',
+                          'H-Yearly': 'H-Yearly',
+                          'Yearly': 'Yearly',
+                          '2-Yearly': '2-Yearly',
+                          '3-Yearly': '3-Yearly',
+                          '4-Yearly': '4-Yearly',
+                          '5-Yearly': '5-Yearly',
+                        },
+                        color: Colors.teal,
+                        icon: Icons.settings_suggest_rounded,
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _maintenanceType = val;
+                              localAuditData['maintenance_type'] = val;
+                            });
+                          }
+                        },
                       ),
                     ),
                   ],
                 ),
-                AnimatedRotation(
-                  turns: _isMetadataExpanded ? 0.0 : -0.25,
-                  duration: const Duration(milliseconds: 200),
-                  child: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF0D7377)),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildDateItem(
+                        'Commissioning', 
+                        _commissioningDate, 
+                        (d) => setState(() => _commissioningDate = d)
+                      )
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildDateItem(
+                        'Take Over', 
+                        _dateOfTakeOver, 
+                        (d) => setState(() => _dateOfTakeOver = d)
+                      )
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildDateItem(
+                        'Plan Maintenance', 
+                        _planDateMaintenance, 
+                        (d) => setState(() => _planDateMaintenance = d)
+                      )
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildDateItem(
+                        'Actual Maintenance', 
+                        _actualDateMaintenance, 
+                        (d) => setState(() => _actualDateMaintenance = d)
+                      )
+                    ),
+                  ],
                 ),
               ],
             ),
+            secondChild: const SizedBox.shrink(),
+            crossFadeState: _isMetadataExpanded ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+            duration: const Duration(milliseconds: 300),
           ),
-        ),
-        const SizedBox(height: 16),
-        
-        // Collapsible Content
-        AnimatedCrossFade(
-          firstChild: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetadataItem(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2, 
-                    child: Stack(
-                      children: [
-                        _buildTextField('Turbine Make', _turbineMakeController),
-                         if (_isLoadingDetails)
-                          const Positioned(
-                            bottom: 2, left: 2, right: 2,
-                            child: LinearProgressIndicator(minHeight: 2),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(flex: 2, child: _buildTextField('WTG Model', _wtgModelController, readOnly: true)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 1, 
-                    child: Stack(
-                      children: [
-                        _buildTextField('WTG Rating', _wtgRatingController),
-                        if (_isLoadingDetails)
-                          const Positioned(
-                            bottom: 2, left: 2, right: 2,
-                            child: LinearProgressIndicator(minHeight: 2),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(child: _buildDatePicker('Commissioning Date', _commissioningDate, (d) => setState(() => _commissioningDate = d))),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildDatePicker('Date of Take Over', _dateOfTakeOver, (d) => setState(() => _dateOfTakeOver = d))),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(child: _buildDatePicker('Plan Date of Maintenance', _planDateMaintenance, (d) => setState(() => _planDateMaintenance = d))),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildDatePicker('Actual Date of Maintenance', _actualDateMaintenance, (d) => setState(() => _actualDateMaintenance = d))),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _buildTextField('Customer Name', _customerNameController),
+              Icon(icon, size: 12, color: Colors.teal.shade300),
+              const SizedBox(width: 4),
+              Text(label, style: GoogleFonts.outfit(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
             ],
           ),
-          secondChild: const SizedBox.shrink(),
-          crossFadeState: _isMetadataExpanded ? CrossFadeState.showFirst : CrossFadeState.showSecond,
-          duration: const Duration(milliseconds: 300),
-        ),
-      ],
+          const SizedBox(height: 2),
+          Text(
+            value.isEmpty ? '---' : value,
+            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 
-
-
-  Widget _buildTextField(String label, TextEditingController controller, {bool readOnly = false}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: readOnly ? Colors.grey[200] : const Color(0xFFE0F2F1), // Visual cue for read-only
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFF80CBC4)),
-          ),
-          child: TextField(
-            controller: controller,
-            readOnly: readOnly,
-            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w500, color: readOnly ? Colors.grey[700] : Colors.black87),
-            decoration: InputDecoration(
-              labelText: label,
-              labelStyle: GoogleFonts.outfit(color: Colors.black54, fontSize: 13),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDatePicker(String label, DateTime? date, void Function(DateTime) onSelect) {
+  Widget _buildDateItem(String label, DateTime? date, void Function(DateTime)? onSelect) {
     return InkWell(
-      onTap: () async {
+      onTap: onSelect == null ? null : () async {
         final picked = await showDatePicker(
           context: context,
           initialDate: date ?? DateTime.now(),
           firstDate: DateTime(2000),
           lastDate: DateTime(2100),
         );
-        if (picked != null) {
-          onSelect(picked);
-        }
+        if (picked != null) onSelect(picked);
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey[400]!),
+          color: Colors.teal.shade50.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.teal.shade100.withValues(alpha: 0.5)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: GoogleFonts.outfit(fontSize: 11, color: Colors.black87, fontWeight: FontWeight.w600)),
+            Text(label, style: GoogleFonts.outfit(fontSize: 10, color: Colors.teal.shade700, fontWeight: FontWeight.w600)),
             const SizedBox(height: 2),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                Icon(Icons.calendar_today_rounded, size: 12, color: Colors.teal.shade400),
+                const SizedBox(width: 6),
                 Text(
-                  date != null ? DateFormat('dd/MM/yyyy').format(date) : 'calendar',
-                  style: GoogleFonts.outfit(fontSize: 13, color: date != null ? Colors.black87 : Colors.grey[400]),
+                  date != null ? DateFormat('dd MMM yyyy').format(date) : 'Not Set',
+                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.teal.shade900),
                 ),
-                Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
               ],
             ),
           ],
@@ -2162,12 +2369,16 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
     );
   }
 
+
+
+
   Widget _buildStatsSection(List<MapEntry<String, dynamic>> tasks) {
     int okCount = 0;
     int notOkCount = 0;
-    for (var entry in tasks) {
+    for (final entry in tasks) {
       final status = entry.value['status']?.toString().toLowerCase() ?? '';
-      if (status == 'ok') {
+      final isCorrected = entry.value['is_corrected'] == true;
+      if (status == 'ok' && !isCorrected) {
         okCount++;
       } else {
         notOkCount++;
@@ -2184,13 +2395,13 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
           borderRadius: BorderRadius.circular(12),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: isActive ? countColor.withValues(alpha: 0.12) : Colors.purple.shade50,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: isActive ? countColor : Colors.transparent,
-                width: 2,
+                width: 1.5,
               ),
             ),
             child: Row(
@@ -2199,17 +2410,17 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: GoogleFonts.outfit(color: Colors.black87, fontSize: 14)),
+                    Text(label, style: GoogleFonts.outfit(color: Colors.black87, fontSize: 12)),
                     if (isActive)
-                      Text('Filtering', style: GoogleFonts.outfit(fontSize: 10, color: countColor, fontWeight: FontWeight.w600)),
+                      Text('Filtering', style: GoogleFonts.outfit(fontSize: 9, color: countColor, fontWeight: FontWeight.w600)),
                   ],
                 ),
                 Row(
                   children: [
-                    Text('$count', style: GoogleFonts.outfit(color: countColor, fontSize: 24, fontWeight: FontWeight.bold)),
+                    Text('$count', style: GoogleFonts.outfit(color: countColor, fontSize: 19, fontWeight: FontWeight.bold)),
                     if (isActive) ...[
-                      const SizedBox(width: 6),
-                      Icon(Icons.close, size: 14, color: countColor),
+                      const SizedBox(width: 4),
+                      Icon(Icons.close, size: 12, color: countColor),
                     ],
                   ],
                 ),
@@ -2219,6 +2430,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
         ),
       );
     }
+
 
     return Row(
       children: [
@@ -2249,14 +2461,30 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
             final newMain = AuditGroup(mainGroup.title);
             mainGroup.subGroups.forEach((k, subGroup) {
               final filteredTasks = subGroup.tasks
-                  .where((t) => (t['status']?.toString().toLowerCase() ?? '') == filterLower)
+                  .where((t) {
+                    final s = t['status']?.toString().toLowerCase() ?? '';
+                    final ic = t['is_corrected'] == true;
+                    if (filterLower == 'ok') return s == 'ok' && !ic;
+                    if (filterLower == 'not ok') return s != 'ok' || ic;
+                    return s == filterLower;
+                  })
                   .toList();
               if (filteredTasks.isNotEmpty) {
                 final newSub = AuditGroup(subGroup.title)
                   ..tasks.addAll(filteredTasks);
                 newMain.subGroups[k] = newSub;
-                newMain.okCount += newSub.tasks.where((t) => (t['status']?.toString().toLowerCase() ?? '') == 'ok').length;
-                newMain.notOkCount += newSub.tasks.where((t) => (t['status']?.toString().toLowerCase() ?? '') != 'ok').length;
+                
+                final allSubTasks = newSub.tasks;
+                newMain.okCount += allSubTasks.where((t) {
+                  final s = t['status']?.toString().toLowerCase() ?? '';
+                  final ic = t['is_corrected'] == true;
+                  return s == 'ok' && !ic;
+                }).length;
+                newMain.notOkCount += allSubTasks.length - (allSubTasks.where((t) {
+                  final s = t['status']?.toString().toLowerCase() ?? '';
+                  final ic = t['is_corrected'] == true;
+                  return s == 'ok' && !ic;
+                }).length);
               }
             });
             return newMain;
@@ -2267,7 +2495,11 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
 
     for (final mainGroup in displayGroups) {
       final allTasks = mainGroup.subGroups.values.expand((sg) => sg.tasks).toList();
-      final okCount = allTasks.where((t) => (t['status']?.toString().toLowerCase() ?? '') == 'ok').length;
+      final okCount = allTasks.where((t) {
+        final s = t['status']?.toString().toLowerCase() ?? '';
+        final ic = t['is_corrected'] == true;
+        return s == 'ok' && !ic;
+      }).length;
       final notOkCount = allTasks.length - okCount;
 
       items.add(_FlatCategoryHeader(
@@ -2281,7 +2513,11 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
 
       for (final subGroup in mainGroup.subGroups.values) {
         final ncCount = subGroup.tasks
-            .where((t) => (t['status']?.toString().toLowerCase() ?? '') != 'ok')
+            .where((t) {
+              final s = t['status']?.toString().toLowerCase() ?? '';
+              final ic = t['is_corrected'] == true;
+              return s != 'ok' || ic;
+            })
             .length;
         // Sub-category separator header
         items.add(_FlatSubCategoryHeader(
@@ -2375,7 +2611,8 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
   /// Single flat task row with a 4px NC strip, color-coded background,
   /// truncated observation, and tap-to-select behaviour.
   Widget _buildFlatTaskItem(Map<String, dynamic> task) {
-    final isOk = (task['status']?.toString().toLowerCase() ?? '') == 'ok';
+    final isCorrected = task['is_corrected'] == true;
+    final isOk = (task['status']?.toString().toLowerCase() ?? '') == 'ok' && !isCorrected;
     final originalIndex = task['original_index'] as int;
     final isSelected = originalIndex == _selectedTaskIndex;
 
@@ -2571,59 +2808,69 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
                   ),
                 ],
                  // Status Toggle
-                 SegmentedButton<String>(
-                   segments: const [
-                     ButtonSegment(
-                       value: 'OK',
-                       label: Text('OK', style: TextStyle(fontSize: 12)),
-                       icon: Icon(Icons.check_circle_outline, size: 15),
-                     ),
-                     ButtonSegment(
-                       value: 'Not OK',
-                       label: Text('Not OK', style: TextStyle(fontSize: 12)),
-                       icon: Icon(Icons.cancel_outlined, size: 15),
-                     ),
-                   ],
-                   selected: {item['status']?.toString() ?? 'Not OK'},
-                   onSelectionChanged: (Set<String> newSel) {
-                     final newStatus = newSel.first;
-                     setState(() {
-                       localAuditData['audit_data'][taskKey]['status'] = newStatus;
-                     });
-                     _markTaskAsModified(index);
-                     if (newStatus == 'Not OK' &&
-                         (localAuditData['audit_data'][taskKey]['nc_category'] == null ||
-                          localAuditData['audit_data'][taskKey]['nc_category'].toString().isEmpty)) {
-                       _showNCCategoryDialog(index);
-                     }
-                   },
-                   style: ButtonStyle(
-                     visualDensity: VisualDensity.compact,
-                     padding: WidgetStateProperty.all(const EdgeInsets.symmetric(horizontal: 8)),
-                     backgroundColor: WidgetStateProperty.resolveWith((states) {
-                       if (states.contains(WidgetState.selected)) {
-                         final selectedStatus = item['status']?.toString() ?? 'Not OK';
-                         return selectedStatus == 'OK' ? Colors.green.shade100 : Colors.red.shade100;
-                       }
-                       return null;
-                     }),
+                 Container(
+                   height: 36,
+                   decoration: BoxDecoration(
+                     color: Colors.white,
+                     borderRadius: BorderRadius.circular(8),
+                     border: Border.all(color: Colors.grey.shade200),
+                   ),
+                   child: Row(
+                     children: [
+                       _buildStatusToggleButton(
+                         label: 'OK', 
+                         isSelected: status == 'ok', 
+                         activeColor: Colors.green,
+                         onTap: () {
+                           setState(() => localAuditData['audit_data'][taskKey]['status'] = 'OK');
+                           _processAuditData();
+                           _markTaskAsModified(index);
+                         }
+                       ),
+                       Container(width: 1, color: Colors.grey.shade200),
+                       _buildStatusToggleButton(
+                         label: 'Not OK', 
+                         isSelected: !isOk, 
+                         activeColor: Colors.red,
+                         onTap: () {
+                           setState(() => localAuditData['audit_data'][taskKey]['status'] = 'Not OK');
+                           _processAuditData();
+                           _markTaskAsModified(index);
+                           if (localAuditData['audit_data'][taskKey]['nc_category'] == null ||
+                               localAuditData['audit_data'][taskKey]['nc_category'].toString().isEmpty) {
+                             _showNCCategoryDialog(index);
+                           }
+                         }
+                       ),
+                     ],
                    ),
                  ),
-                if (!isOk) ...[
+                if (!isOk || item['is_corrected'] == true) ...[
                   // Sub-Status Dropdown
-                  ModernSearchableDropdown(
-                    label: 'Sub Status',
-                    showLabel: false,
-                    value: <String>['Aobs', 'MCF', 'CF'].contains(subStatus) ? subStatus.toString() : null,
-                    items: const {'Aobs': 'Aobs', 'MCF': 'MCF', 'CF': 'CF'},
-                    color: Colors.orange,
-                    icon: Icons.priority_high_rounded,
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() => localAuditData['audit_data'][taskKey]['sub_status'] = val);
-                        _markTaskAsModified(index);
-                      }
-                    },
+                  SizedBox(
+                    height: 32,
+                    width: 140, // Added explicit width for density
+                    child: Builder(builder: (context) {
+                      final s = subStatus.toString().toUpperCase();
+                      return ModernSearchableDropdown(
+                        label: 'Sub Status',
+                        compact: true,
+                        showLabel: false,
+                        value: <String>['Aobs', 'MCF', 'CF'].contains(subStatus) ? subStatus.toString() : null,
+                        items: const {'Aobs': 'Aobs', 'MCF': 'MCF', 'CF': 'CF'},
+                        color: (s == 'CF' ? Colors.red : (s == 'MCF' ? Colors.blue : Colors.grey)),
+                        icon: Icons.priority_high_rounded,
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              localAuditData['audit_data'][taskKey]['sub_status'] = val;
+                              _processAuditData(); // Reactive update
+                              _markTaskAsModified(index);
+                            });
+                          }
+                        },
+                      );
+                    }),
                   ),
                   
                   // Reference Selector
@@ -2635,7 +2882,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
                         showLabel: false,
                         hint: 'Select Reference',
                         value: refId,
-                        items: { for (var r in _allReferences) r['id'].toString() : r['name'].toString() },
+                        items: { for (final r in _allReferences) r['id'].toString() : r['name'].toString() },
                         color: Colors.blue,
                         icon: Icons.menu_book_rounded,
                         onChanged: (val) {
@@ -2693,7 +2940,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
                   ],
                   
                    // 2x2 Grid Layout for Not OK tasks, simple layout for OK tasks
-                  if (!isOk) ...[
+                  if (!isOk || item['is_corrected'] == true) ...[
                     // 2x2 Grid: Left Column (Observation + Photos), Right Column (Remark + Closure)
                     IntrinsicHeight(
                       child: Row(
@@ -3337,12 +3584,12 @@ class StatusRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    int notOkCount = tasks.where((t) => (t['status']?.toString().toLowerCase() ?? '') == 'not ok').length;
-    int totalCount = tasks.length;
+    final int notOkCount = tasks.where((t) => (t['status']?.toString().toLowerCase() ?? '') == 'not ok').length;
+    final int totalCount = tasks.length;
     
     // Logic: Show Not OK count if > 0, else show Total count
-    String centerText = notOkCount > 0 ? '$notOkCount' : '$totalCount';
-    Color centerTextColor = notOkCount > 0 ? Colors.red : Colors.black;
+    final String centerText = notOkCount > 0 ? '$notOkCount' : '$totalCount';
+    final Color centerTextColor = notOkCount > 0 ? Colors.red : Colors.black;
 
     return CustomPaint(
       size: Size(size, size),
@@ -3378,14 +3625,14 @@ class StatusRingPainter extends CustomPainter {
     
     // Draw background circle (light grey) maybe? No, requirement didn't specify.
 
-    final double strokeWidth = 4.0; 
+    const double strokeWidth = 4.0; 
     final Rect rect = Rect.fromLTWH(strokeWidth / 2, strokeWidth / 2, size.width - strokeWidth, size.height - strokeWidth);
     
     double startAngle = -3.14159 / 2; // -90 degrees (Start from top)
-    double sweepAngle = (2 * 3.14159) / tasks.length;
+    final double sweepAngle = (2 * 3.14159) / tasks.length;
     
     // Add a small gap between segments for visual clarity
-    double gap = tasks.length > 1 ? 0.2 : 0.0; // in radians
+    final double gap = tasks.length > 1 ? 0.2 : 0.0; // in radians
     double drawSweep = sweepAngle - gap;
     if (drawSweep <= 0) drawSweep = sweepAngle; // Fallback if too many tasks
 
@@ -3394,10 +3641,10 @@ class StatusRingPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.butt; // Flat ends for donut segments
 
-    for (var task in tasks) {
+    for (final task in tasks) {
       paint.color = _getColor(task);
       // Center the segment in its angular slot if we have a gap
-      double currentStart = startAngle + (gap / 2);
+      final double currentStart = startAngle + (gap / 2);
       canvas.drawArc(rect, currentStart, drawSweep, false, paint);
       startAngle += sweepAngle;
     }
@@ -3405,7 +3652,7 @@ class StatusRingPainter extends CustomPainter {
 
   Color _getColor(Map<String, dynamic> task) {
     final status = task['status']?.toString().toLowerCase() ?? '';
-    final hasObservation = (task['observation']?.toString().trim().isNotEmpty ?? false);
+    final hasObservation = task['observation']?.toString().trim().isNotEmpty ?? false;
 
     // Red: If status is 'Not OK'
     if (status == 'not ok' || status == 'notok' || status == 'not_ok') {
@@ -3432,3 +3679,4 @@ class StatusRingPainter extends CustomPainter {
     return true; 
   }
 }
+

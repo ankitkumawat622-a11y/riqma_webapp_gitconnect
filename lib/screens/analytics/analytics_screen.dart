@@ -60,7 +60,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       final Map<String, int> material = {};
       final Map<String, int> nc = {};
 
-      for (var doc in _allAudits) {
+      for (final doc in _allAudits) {
         final data = doc.data() as Map<String, dynamic>;
         
         // 1. Extract Filters
@@ -80,12 +80,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         // 2. Process Data (Apply current filters immediately)
         // Note: Even on initial load, we might have filters if passed from parent, 
         // though typically they are null/'All' initially.
-        bool matchState = widget.selectedState == null || widget.selectedState == 'All States' || data['state'] == widget.selectedState;
-        bool matchSite = widget.selectedSite == null || widget.selectedSite == 'All Sites' || data['site'] == widget.selectedSite;
+        final bool matchState = widget.selectedState == null || widget.selectedState == 'All States' || data['state'] == widget.selectedState;
+        final bool matchSite = widget.selectedSite == null || widget.selectedSite == 'All Sites' || data['site'] == widget.selectedSite;
 
         if (matchState && matchSite) {
              final auditData = data['audit_data'] as Map<String, dynamic>? ?? {};
-             for (var entry in auditData.values) {
+             for (final entry in auditData.values) {
                 final task = entry as Map<String, dynamic>;
                 final status = (task['status'] ?? '').toString().toLowerCase();
 
@@ -151,7 +151,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final Map<String, int> material = {};
     final Map<String, int> nc = {};
 
-    for (var doc in _allAudits) {
+    for (final doc in _allAudits) {
       final data = doc.data() as Map<String, dynamic>?;
       if (data == null) continue;
       
@@ -165,7 +165,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
       final auditData = data['audit_data'] as Map<String, dynamic>? ?? {};
 
-      for (var entry in auditData.values) {
+      for (final entry in auditData.values) {
         final task = entry as Map<String, dynamic>;
         final status = (task['status'] ?? '').toString().toLowerCase();
 
@@ -329,7 +329,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     // Take top 7 categories to prevent overcrowding
     final displayKeys = sortedKeys.take(7).toList();
 
-    for (var key in displayKeys) {
+    for (final key in displayKeys) {
       final data = _severityData[key]!;
       final cf = data['CF']?.toDouble() ?? 0;
       final mcf = data['MCF']?.toDouble() ?? 0;
@@ -421,7 +421,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final colors = [const Color(0xFF5E35B1), const Color(0xFF3949AB), const Color(0xFF1E88E5), const Color(0xFF039BE5), const Color(0xFF00ACC1)];
     
     int index = 0;
-    int total = _rootCauseData.values.fold(0, (a, b) => a + b);
+    final int total = _rootCauseData.values.fold(0, (a, b) => a + b);
 
     // Guard against division by zero
     if (total == 0) {
@@ -437,7 +437,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     // Sort to show largest causes first
     final sortedEntries = _rootCauseData.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
-    for (var entry in sortedEntries) {
+    for (final entry in sortedEntries) {
       final percentage = (entry.value / total) * 100;
       final isLarge = percentage > 10;
       
@@ -521,7 +521,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       final groups = <BarChartGroupData>[];
       int index = 0;
 
-      for (var key in keys) {
+      for (final key in keys) {
         groups.add(BarChartGroupData(
           x: index,
           barRods: [
@@ -608,7 +608,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     
     final sortedKeys = _ncData.keys.toList();
 
-    for (var key in sortedKeys) {
+    for (final key in sortedKeys) {
       groups.add(BarChartGroupData(
         x: index,
         barRods: [

@@ -37,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       // Auto-append @renom.com if user enters only Employee ID
-      String input = _emailController.text.trim();
+      final String input = _emailController.text.trim();
       String emailToUse;
       if (input.contains('@')) {
         emailToUse = input;

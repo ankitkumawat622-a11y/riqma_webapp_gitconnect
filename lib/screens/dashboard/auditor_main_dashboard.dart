@@ -50,7 +50,7 @@ class _AuditorMainDashboardScreenState extends State<AuditorMainDashboardScreen>
     return email;
   }
 
-  void _showAddPlanDialog(BuildContext context) async {
+  Future<void> _showAddPlanDialog(BuildContext context) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       return;
@@ -95,13 +95,13 @@ class _AuditorMainDashboardScreenState extends State<AuditorMainDashboardScreen>
         if (context.mounted) Navigator.pop(context); // Close loading
 
         // Bypass check if Manager/Admin
-        final bool isAuditor = (role == 'auditor' || role == null);
+        final bool isAuditor = role == 'auditor' || role == null;
         
         // Final fallback if assignedStateId is still null but we have a name (for newly assigned users)
         if (assignedStateId == null && assignedState != null && assignedState.isNotEmpty) {
            final statesSnap = await FirebaseFirestore.instance.collection('states').get();
-           for (var doc in statesSnap.docs) {
-             if ((doc.data())['state']?.toString() == assignedState) {
+           for (final doc in statesSnap.docs) {
+             if (doc.data()['state']?.toString() == assignedState) {
                assignedStateId = doc.id;
                break;
              }
@@ -428,7 +428,7 @@ class _AuditorMainDashboardScreenState extends State<AuditorMainDashboardScreen>
         final userData = userDoc.data();
         final assignedState = userData?['assigned_state'] as String?;
         final role = userData?['role'] as String?;
-        final bool isAuditor = (role == 'auditor' || role == null);
+        final bool isAuditor = role == 'auditor' || role == null;
 
         if (assignedState != null && assignedState.isNotEmpty) {
           unawaited(Navigator.push<void>(
@@ -515,7 +515,7 @@ class _AuditorMainDashboardScreenState extends State<AuditorMainDashboardScreen>
                 final userData = userSnapshot.data!.data() as Map<String, dynamic>?;
                 final assignedState = userData?['assigned_state'] as String?;
                 final role = userData?['role'] as String?;
-                final bool isAuditor = (role == 'auditor' || role == null);
+                final bool isAuditor = role == 'auditor' || role == null;
 
                 if (isAuditor && (assignedState == null || assignedState.isEmpty)) {
                   return Text('0', style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.bold, color: const Color(0xFF1A1F36)));
@@ -537,7 +537,7 @@ class _AuditorMainDashboardScreenState extends State<AuditorMainDashboardScreen>
                       return Text('0', style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.bold, color: const Color(0xFF1A1F36)));
                     }
                     int totalTurbines = 0;
-                    for (var doc in planningSnapshot.data!.docs) {
+                    for (final doc in planningSnapshot.data!.docs) {
                       final data = doc.data() as Map<String, dynamic>;
                       final turbines = data['number_of_turbines'];
                       if (turbines is int) {
@@ -812,7 +812,7 @@ class _PlanAuditDialogState extends State<_PlanAuditDialog> {
   void initState() {
     super.initState();
     
-    final bool isAuditor = (widget.role == 'auditor' || widget.role == null);
+    final bool isAuditor = widget.role == 'auditor' || widget.role == null;
 
     if (widget.initialData != null) {
       _selectedSite = widget.initialData!['site_name']?.toString();
@@ -933,17 +933,17 @@ class _PlanAuditDialogState extends State<_PlanAuditDialog> {
       // SAFETY FIX: If ID is missing but we have a name, fetch the ID
       if (_assignedStateId == null && widget.assignedState.isNotEmpty) {
         try {
-          var stateQuery = await FirebaseFirestore.instance
+          final stateQuery = await FirebaseFirestore.instance
               .collection('states')
               .where('state', isEqualTo: widget.assignedState)
               .limit(1)
               .get();
           if (stateQuery.docs.isNotEmpty) {
             _assignedStateId = stateQuery.docs.first.id;
-            debugPrint("✅ Recovered State ID: $_assignedStateId");
+            debugPrint('✅ Recovered State ID: $_assignedStateId');
           }
         } catch (e) {
-             debugPrint("⚠️ Failed to recover State ID: $e");
+             debugPrint('⚠️ Failed to recover State ID: $e');
         }
       }
 
@@ -1020,7 +1020,7 @@ class _PlanAuditDialogState extends State<_PlanAuditDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isAuditor = (widget.role == 'auditor' || widget.role == null);
+    final bool isAuditor = widget.role == 'auditor' || widget.role == null;
     final bool isEditing = widget.planId != null;
 
     return GlassDialogWrapper(
@@ -1084,7 +1084,7 @@ class _PlanAuditDialogState extends State<_PlanAuditDialog> {
                 builder: (context, snapshot) {
                   final states = snapshot.data?.docs ?? [];
                   final Map<String, String> stateMap = {
-                    for (var doc in states)
+                    for (final doc in states)
                       doc.id: (doc.data() as Map<String, dynamic>)['state']?.toString() ?? 'Unknown'
                   };
 
@@ -1136,7 +1136,7 @@ class _PlanAuditDialogState extends State<_PlanAuditDialog> {
                   builder: (context, snapshot) {
                     final sites = snapshot.data?.docs ?? [];
                     final Map<String, String> siteMap = {
-                      for (var doc in sites)
+                      for (final doc in sites)
                         doc.id: (doc.data() as Map<String, dynamic>)['site_name']?.toString() ?? 
                                (doc.data() as Map<String, dynamic>)['name']?.toString() ?? 'Unknown'
                     };
@@ -1184,7 +1184,7 @@ class _PlanAuditDialogState extends State<_PlanAuditDialog> {
                   isLoading: _loadingModels,
                   onTap: _selectedSiteId == null ? () {} : () {
                     final Map<String, String> modelMap = {
-                      for (var doc in _availableModels)
+                      for (final doc in _availableModels)
                         doc.id: doc.data()['name']?.toString() ?? 'Unknown'
                     };
                     showDialog<void>(
@@ -1388,7 +1388,7 @@ class AuditorMyPlansScreen extends StatelessWidget {
     required this.assignedState,
   });
 
-  void _deletePlan(BuildContext context, String docId) async {
+  Future<void> _deletePlan(BuildContext context, String docId) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

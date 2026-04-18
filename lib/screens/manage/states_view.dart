@@ -128,7 +128,7 @@ class _StatesViewState extends State<StatesView> {
             ModernSearchableDropdown(
               label: 'Zone',
               items: {
-                for (var z in ['North', 'South', 'East', 'West', 'Central', 'North-East'])
+                for (final z in ['North', 'South', 'East', 'West', 'Central', 'North-East'])
                   z: z
               },
               value: zoneController.text.trim().isEmpty ? null : zoneController.text.trim(),
@@ -178,7 +178,7 @@ class _StatesViewState extends State<StatesView> {
     ));
   }
 
-  void _editItem(String? docId) async {
+  Future<void> _editItem(String? docId) async {
     if (docId == null) {
       return;
     }
@@ -215,7 +215,7 @@ class _StatesViewState extends State<StatesView> {
               ModernSearchableDropdown(
                 label: 'Zone',
                 items: {
-                  for (var z in ['North', 'South', 'East', 'West', 'Central', 'North-East'])
+                  for (final z in ['North', 'South', 'East', 'West', 'Central', 'North-East'])
                     z: z
                 },
                 value: zoneController.text.trim().isEmpty ? null : zoneController.text.trim(),

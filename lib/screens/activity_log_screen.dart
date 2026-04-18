@@ -113,7 +113,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                     label: 'User',
                     value: _selectedUserId,
                     items: {
-                      for (var user in _usersList) user['userId']!: user['userName']!
+                      for (final user in _usersList) user['userId']!: user['userName']!
                     },
                     color: Colors.blue,
                     icon: Icons.person_rounded,
@@ -128,7 +128,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                     label: 'Action',
                     value: _selectedActionType?.name, // Use name for value mapping key
                     items: {
-                      for (var type in ActivityActionType.values) type.name: type.displayName
+                      for (final type in ActivityActionType.values) type.name: type.displayName
                     },
                     color: Colors.purple,
                     icon: Icons.category_rounded,

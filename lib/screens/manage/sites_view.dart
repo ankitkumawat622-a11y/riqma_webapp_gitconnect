@@ -189,7 +189,7 @@ class _SitesViewState extends State<SitesView> {
               const SizedBox(height: 16),
               ModernSearchableDropdown(
                 label: 'Zone',
-                items: {for (var z in zoneList) z: z},
+                items: {for (final z in zoneList) z: z},
                 value: selectedZone,
                 color: Colors.blue,
                 icon: Icons.map_rounded,
@@ -227,7 +227,7 @@ class _SitesViewState extends State<SitesView> {
                   }
 
                   final Map<String, String> stateMap = {
-                    for (var doc in states) 
+                    for (final doc in states) 
                       doc.id: (doc.data() as Map<String, dynamic>)['state']?.toString() ?? 'Unknown State'
                   };
 
@@ -300,7 +300,7 @@ class _SitesViewState extends State<SitesView> {
   }
 
 
-  void _editItem(String? docId) async {
+  Future<void> _editItem(String? docId) async {
     if (docId == null) {
       return;
     }
@@ -366,7 +366,7 @@ class _SitesViewState extends State<SitesView> {
                   const SizedBox(height: 16),
                   ModernSearchableDropdown(
                     label: 'Zone',
-                    items: {for (var z in zoneList) z: z},
+                    items: {for (final z in zoneList) z: z},
                     value: selectedZone,
                     color: Colors.blue,
                     icon: Icons.map_rounded,
@@ -381,7 +381,7 @@ class _SitesViewState extends State<SitesView> {
                     }
                     final states = snapshot.data!.docs;
                     final Map<String, String> stateMap = {
-                      for (var doc in states) 
+                      for (final doc in states) 
                         doc.id: (doc.data() as Map<String, dynamic>).containsKey('state') 
                             ? (doc.data() as Map<String, dynamic>)['state'].toString() 
                             : ((doc.data() as Map<String, dynamic>).containsKey('name') 

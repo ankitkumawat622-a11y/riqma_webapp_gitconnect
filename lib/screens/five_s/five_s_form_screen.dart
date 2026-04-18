@@ -55,7 +55,7 @@ class _FiveSFormScreenState extends State<FiveSFormScreen> {
     // Initialize answers with default score 0
     _questions.forEach((pillar, questions) {
       _answers[pillar] = {};
-      for (var q in questions) {
+      for (final q in questions) {
         _answers[pillar]![q] = 0;
       }
     });

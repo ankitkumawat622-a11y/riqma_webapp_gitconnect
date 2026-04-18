@@ -30,7 +30,7 @@ class DashboardScreen extends StatelessWidget {
         final Set<String> activeSites = {};
         final Map<String, int> auditsPerMonth = {};
 
-        for (var doc in docs) {
+        for (final doc in docs) {
           final data = doc.data() as Map<String, dynamic>;
           final site = data['site'] as String? ?? 'Unknown';
           activeSites.add(site);

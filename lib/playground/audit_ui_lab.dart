@@ -36,10 +36,10 @@ class _AuditUiLabState extends State<AuditUiLab> with TickerProviderStateMixin {
     final List<String> catNames = ['Hub', 'Nacelle', 'Tower', 'Basement', 'Blade'];
     final List<String> subCatNames = ['Electrical', 'Mechanical', 'Hydraulic', 'Safety', 'Infrastructural'];
     
-    List<Checkpoint> data = [];
-    for (var cat in catNames) {
-      for (var sub in subCatNames) {
-        int count = random.nextInt(3) + 2; // 2-4 items per subcat
+    final List<Checkpoint> data = [];
+    for (final cat in catNames) {
+      for (final sub in subCatNames) {
+        final int count = random.nextInt(3) + 2; // 2-4 items per subcat
         for (int i = 0; i < count; i++) {
           final isOk = random.nextDouble() > 0.3; // 70% OK
           data.add(Checkpoint(
@@ -60,8 +60,8 @@ class _AuditUiLabState extends State<AuditUiLab> with TickerProviderStateMixin {
   }
 
   void _updateCategories() {
-    Map<String, List<Checkpoint>> grouped = {};
-    for (var cp in _allCheckpoints) {
+    final Map<String, List<Checkpoint>> grouped = {};
+    for (final cp in _allCheckpoints) {
       grouped.putIfAbsent(cp.category, () => []).add(cp);
     }
 

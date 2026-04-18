@@ -170,7 +170,7 @@ class _ReferenceManagementScreenState extends State<ReferenceManagementScreen> {
     ));
   }
 
-  void _editItem(String? docId) async {
+  Future<void> _editItem(String? docId) async {
     if (docId == null) {
       return;
     }

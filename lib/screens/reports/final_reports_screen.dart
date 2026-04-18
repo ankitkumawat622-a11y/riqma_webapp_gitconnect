@@ -79,7 +79,7 @@ class _FinalReportsScreenState extends State<FinalReportsScreen> {
       final Set<String> states = {};
       final Set<String> sites = {};
 
-      for (var d in sitesSnap.docs) {
+      for (final d in sitesSnap.docs) {
          final dData = d.data();
          final siteName = dData['site_name']?.toString() ?? '';
          final stateName = dData['state']?.toString() ?? '';
@@ -93,7 +93,7 @@ class _FinalReportsScreenState extends State<FinalReportsScreen> {
       // Fetch Auditors
       final usersSnap = await FirebaseFirestore.instance.collection('users').where('role', isEqualTo: 'auditor').get();
       final Set<String> auditors = {};
-      for (var d in usersSnap.docs) {
+      for (final d in usersSnap.docs) {
          final data = d.data();
          auditors.add(data['name']?.toString() ?? data['email']?.toString() ?? '');
       }
@@ -236,13 +236,13 @@ class _FinalReportsScreenState extends State<FinalReportsScreen> {
   void _updateHeadcounts() {
     if (stateManager == null) return;
     
-    int total = stateManager!.refRows.length;
+    final int total = stateManager!.refRows.length;
     int thisMonth = 0;
     
     final currentMonth = DateTime.now().month.toString().padLeft(2, '0');
     final currentYear = DateTime.now().year.toString();
 
-    for (var row in stateManager!.refRows) {
+    for (final row in stateManager!.refRows) {
         final dateStr = row.cells['date']?.value.toString() ?? '';
         if (dateStr.length == 10) {
            final parts = dateStr.split('/');
@@ -380,7 +380,7 @@ class _FinalReportsScreenState extends State<FinalReportsScreen> {
                 child: ModernSearchableDropdown(
                   label: 'State',
                   value: _selectedState,
-                  items: {for (var v in _stateOptions) v: v},
+                  items: {for (final v in _stateOptions) v: v},
                   color: Colors.blue,
                   icon: Icons.map_outlined,
                   onChanged: (String? v) => setState(() { _selectedState = v; _applyDropdownFilters(); }),
@@ -392,7 +392,7 @@ class _FinalReportsScreenState extends State<FinalReportsScreen> {
               child: ModernSearchableDropdown(
                 label: 'Site',
                 value: _selectedSite,
-                items: {for (var v in _siteOptions) v: v},
+                items: {for (final v in _siteOptions) v: v},
                 color: Colors.teal,
                 icon: Icons.location_on_outlined,
                 onChanged: (String? v) => setState(() { _selectedSite = v; _applyDropdownFilters(); }),
@@ -404,7 +404,7 @@ class _FinalReportsScreenState extends State<FinalReportsScreen> {
                 child: ModernSearchableDropdown(
                   label: 'Auditor',
                   value: _selectedAuditor,
-                  items: {for (var v in _auditorOptions) v: v},
+                  items: {for (final v in _auditorOptions) v: v},
                   color: Colors.cyan,
                   icon: Icons.person_search_outlined,
                   onChanged: (String? v) => setState(() { _selectedAuditor = v; _applyDropdownFilters(); }),
@@ -416,7 +416,7 @@ class _FinalReportsScreenState extends State<FinalReportsScreen> {
               child: ModernSearchableDropdown(
                 label: 'Year',
                 value: _selectedYear,
-                items: {for (var v in _yearOptions) v: v},
+                items: {for (final v in _yearOptions) v: v},
                 color: Colors.amber,
                 icon: Icons.calendar_today_outlined,
                 onChanged: (String? v) => setState(() { _selectedYear = v; _applyDropdownFilters(); }),
@@ -427,7 +427,7 @@ class _FinalReportsScreenState extends State<FinalReportsScreen> {
               child: ModernSearchableDropdown(
                 label: 'Month',
                 value: _selectedMonth,
-                items: {for (var v in _monthOptions) v: v},
+                items: {for (final v in _monthOptions) v: v},
                 color: Colors.orange,
                 icon: Icons.calendar_month_outlined,
                 onChanged: (String? v) => setState(() { _selectedMonth = v; _applyDropdownFilters(); }),
@@ -579,14 +579,14 @@ class _FinalReportsScreenState extends State<FinalReportsScreen> {
     if (state != null) await state._handleExport('Generating NC Tracking Excel with Images...', () => ExcelExportService().generateNCTrackingExcel(auditId, data));
   }
 
-  void _onExportSQA(PlutoColumnRendererContext ctx) async {
+  Future<void> _onExportSQA(PlutoColumnRendererContext ctx) async {
     final state = ctx.stateManager.gridFocusNode.context?.findAncestorStateOfType<_FinalReportsScreenState>();
     final data = ctx.row.cells['data']?.value as Map<String, dynamic>;
     final auditId = ctx.row.cells['id']?.value as String;
     if (state != null) await state._handleExport('Generating SQA Dump...', () => ExcelExportService().generateSQADumpExcel(auditId, data));
   }
 
-  void _onBulkExportSQA() async {
+  Future<void> _onBulkExportSQA() async {
     if (stateManager == null || stateManager!.refRows.isEmpty) {
       _showError('No records available to export.');
       return;

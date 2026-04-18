@@ -21,10 +21,12 @@ class ModernSearchableDropdown extends StatefulWidget {
     this.hint,
     this.enabled = true,
     this.showLabel = true,
+    this.compact = false,
   });
 
   final bool enabled;
   final bool showLabel;
+  final bool compact;
 
   @override
   State<ModernSearchableDropdown> createState() => _ModernSearchableDropdownState();
@@ -56,10 +58,13 @@ class _ModernSearchableDropdownState extends State<ModernSearchableDropdown> {
         } : null,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: widget.compact ? 8 : 16, 
+            vertical: widget.compact ? 6 : 12,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(widget.compact ? 8 : 16),
             border: Border.all(
               color: !widget.enabled 
                   ? Colors.grey.shade100 
@@ -78,55 +83,57 @@ class _ModernSearchableDropdownState extends State<ModernSearchableDropdown> {
           child: Opacity(
             opacity: widget.enabled ? 1.0 : 0.5,
             child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: widget.color.shade50,
-                  borderRadius: BorderRadius.circular(8),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(widget.compact ? 4 : 8),
+                  decoration: BoxDecoration(
+                    color: widget.color.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(widget.icon, color: widget.color.shade700, size: widget.compact ? 14 : 18),
                 ),
-                child: Icon(widget.icon, color: widget.color.shade700, size: 18),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (widget.showLabel) ...[
-                      Text(
-                        widget.label,
-                        style: GoogleFonts.outfit(
-                          fontSize: 10,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
+                SizedBox(width: widget.compact ? 8 : 12),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (widget.showLabel && !widget.compact) ...[
+                        Text(
+                          widget.label,
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                          ),
                         ),
+                        const SizedBox(height: 2),
+                      ],
+                      Text(
+                        displayValue ?? widget.hint ?? 'Select ${widget.label}',
+                        style: GoogleFonts.outfit(
+                          fontSize: widget.compact ? 12 : 14,
+                          color: displayValue != null ? const Color(0xFF1A1F36) : Colors.grey[500],
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
                     ],
-                    Text(
-                      displayValue ?? widget.hint ?? 'Select ${widget.label}',
-                      style: GoogleFonts.outfit(
-                        fontSize: 14,
-                        color: displayValue != null ? const Color(0xFF1A1F36) : Colors.grey[500],
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: _isHovering ? widget.color.shade400 : Colors.grey[400],
-                size: 20,
-              ),
-            ],
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: _isHovering ? widget.color.shade400 : Colors.grey[400],
+                  size: widget.compact ? 16 : 20,
+                ),
+              ],
+            ),
           ),
         ),
-      ),
     ),
   );
   }
