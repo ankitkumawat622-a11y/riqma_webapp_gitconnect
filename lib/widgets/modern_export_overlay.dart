@@ -74,7 +74,7 @@ class _ModernExportOverlayState extends State<ModernExportOverlay> with SingleTi
   }
 
   String _getRemainingTime() {
-    if (_startTime == null || _currentProgress.value <= 0.05 || _isCompleted) return '--:--';
+    if (_startTime == null || _currentProgress.value <= 0.0 || _isCompleted) return '--:--';
     
     final elapsed = DateTime.now().difference(_startTime!);
     final estimatedTotal = elapsed.inMilliseconds / _currentProgress.value;

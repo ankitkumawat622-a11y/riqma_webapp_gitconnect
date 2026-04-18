@@ -436,7 +436,13 @@ class _ApprovedPlanCardState extends State<ApprovedPlanCard> {
     final state = widget.data['state']?.toString() ?? 'State';
     final model = widget.data['turbine_model']?.toString() ?? 'Model';
     final modelId = widget.data['turbine_model_id']?.toString();
-    final make = (modelId != null ? widget.makeMap[modelId] : null) ?? 'Manufacturer';
+    
+    // Resolve Make: Priority 1: Data field 'turbine_make', Priority 2: Lookup via modelId, Priority 3: Data field 'make'
+    final make = widget.data['turbine_make']?.toString() ?? 
+                 (modelId != null ? widget.makeMap[modelId] : null) ?? 
+                 widget.data['make']?.toString() ?? 
+                 'Manufacturer';
+                 
     final auditor = widget.data['auditor_name']?.toString() ?? 'Assigned Auditor';
 
     return MouseRegion(

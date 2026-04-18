@@ -1250,8 +1250,6 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
             rootCauseItems.insert(0, selectedRootCause!);
           }
 
-          String? selectedRefId = item['reference_id']?.toString();
-
           return AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: Row(
@@ -1379,18 +1377,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    // Reference Selection
-                    Text('Reference Documentation', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 8),
-                    ModernSearchableDropdown(
-                      label: 'Referance',
-                      value: _refIdToName.containsKey(selectedRefId) ? selectedRefId : null,
-                      items: _refIdToName,
-                      color: Colors.blueGrey,
-                      icon: Icons.menu_book_rounded,
-                      onChanged: (val) => setDialogState(() => selectedRefId = val),
-                    ),
+
 
                     // PI Section (Read-Only Display)
                     if (item['material_status'] != null && item['material_status'].toString().isNotEmpty) ...[
@@ -1460,10 +1447,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
                     if (closingDate != null) {
                       localAuditData['audit_data'][taskKey]['closing_date'] = Timestamp.fromDate(closingDate!);
                     }
-                    localAuditData['audit_data'][taskKey]['reference_id'] = selectedRefId;
-                    if (selectedRefId != null) {
-                      localAuditData['audit_data'][taskKey]['reference_name'] = _refIdToName[selectedRefId];
-                    }
+
                   });
                   Navigator.pop(context);
                 },
@@ -1794,61 +1778,6 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
                     Expanded(child: _buildMetadataItem('WTG Rating', _wtgRatingController.text, Icons.bolt_rounded)),
                     const SizedBox(width: 12),
                     Expanded(child: _buildMetadataItem('Customer', _customerNameController.text, Icons.business_rounded)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Divider(height: 1),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ModernSearchableDropdown(
-                        label: 'Assessment Stage',
-                        value: _assessmentStage,
-                        items: const {
-                          'Commissioning': 'Commissioning',
-                          'Maintenance': 'Maintenance',
-                          'Major Component': 'Major Component',
-                          'RWP': 'RWP',
-                        },
-                        color: Colors.teal,
-                        icon: Icons.assignment_turned_in_rounded,
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() {
-                              _assessmentStage = val;
-                              localAuditData['assessment_stage'] = val;
-                            });
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ModernSearchableDropdown(
-                        label: 'Maintenance Type',
-                        value: _maintenanceType,
-                        items: const {
-                          '500 Hr': '500 Hr',
-                          'H-Yearly': 'H-Yearly',
-                          'Yearly': 'Yearly',
-                          '2-Yearly': '2-Yearly',
-                          '3-Yearly': '3-Yearly',
-                          '4-Yearly': '4-Yearly',
-                          '5-Yearly': '5-Yearly',
-                        },
-                        color: Colors.teal,
-                        icon: Icons.settings_suggest_rounded,
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() {
-                              _maintenanceType = val;
-                              localAuditData['maintenance_type'] = val;
-                            });
-                          }
-                        },
-                      ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -2461,24 +2390,46 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
                       ),
                     ],
                     
-                    if (referenceName.toString().isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        height: 36,
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Ref: $referenceName', 
-                            style: GoogleFonts.outfit(fontSize: 11, color: Colors.grey.shade700, fontWeight: FontWeight.w600)
+                    const SizedBox(width: 8),
+                    // Reference Selection (Directly in Header)
+                    SizedBox(
+                      height: 36,
+                      child: widget.isReadOnly
+                        ? (referenceName.toString().isNotEmpty 
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.grey.shade200),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Ref: $referenceName', 
+                                    style: GoogleFonts.outfit(fontSize: 11, color: Colors.grey.shade700, fontWeight: FontWeight.w600)
+                                  ),
+                                ),
+                              )
+                            : const SizedBox.shrink())
+                        : ModernSearchableDropdown(
+                            label: 'Reference',
+                            compact: true,
+                            showLabel: false,
+                            value: _refIdToName.containsKey(refId) ? refId : null,
+                            items: _refIdToName,
+                            color: Colors.blueGrey,
+                            icon: Icons.menu_book_rounded,
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  localAuditData['audit_data'][taskKey]['reference_id'] = val;
+                                  localAuditData['audit_data'][taskKey]['reference_name'] = _refIdToName[val];
+                                  _processAuditData();
+                                });
+                              }
+                            },
                           ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ],
                 ),
               ],

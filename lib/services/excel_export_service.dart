@@ -55,7 +55,7 @@ class ExcelExportService {
   /// Generates and downloads the NC Tracking Excel for a specific audit.
   Future<void> generateNCTrackingExcel(String auditId, Map<String, dynamic> auditData, {void Function(double, String)? onProgress}) async {
     try {
-      if (onProgress != null) onProgress(0.05, 'Starting NC Tracking Export...');
+      if (onProgress != null) onProgress(0.05, 'Preparing NC Tracking Data...');
       final Workbook workbook = Workbook();
       final Worksheet sheet = workbook.worksheets[0];
       sheet.name = 'NC Tracking';
@@ -89,6 +89,9 @@ class ExcelExportService {
           if (ia != null && ib != null) return ia.compareTo(ib);
           return a.key.compareTo(b.key);
         });
+      
+      final totalTasks = sortedEntries.length;
+      int processedCount = 0;
 
       for (final entry in sortedEntries) {
           final taskKey = entry.key;
@@ -162,6 +165,11 @@ class ExcelExportService {
 
           rowIndex++;
           srNo++;
+          processedCount++;
+          if (onProgress != null) {
+            final progress = 0.05 + (0.85 * (processedCount / totalTasks));
+            onProgress(progress, 'Processing NC ${processedCount} of ${totalTasks}...');
+          }
       }
 
       if (srNo == 1) {
@@ -186,8 +194,10 @@ class ExcelExportService {
       
       final fileName = 'NC_Tracking_${siteCode}_${turbineNo}_${fyYear}_$seqStr.xlsx';
       
+      if (onProgress != null) onProgress(0.95, 'Generating Excel File...');
       final List<int> bytes = workbook.saveAsStream();
       workbook.dispose();
+      if (onProgress != null) onProgress(1.0, 'Download Starting...');
       _downloadExcelBytes(bytes, fileName);
     } catch (e) {
       // debugPrint('Error: $e');
@@ -279,6 +289,9 @@ class ExcelExportService {
           if (ia != null && ib != null) return ia.compareTo(ib);
           return a.key.compareTo(b.key);
         });
+      
+      final totalTasks = sortedEntries.length;
+      int processedCount = 0;
 
       for (final entry in sortedEntries) {
         final taskKey = entry.key;
@@ -381,6 +394,11 @@ class ExcelExportService {
 
         srNo++;
         rowIndex++;
+        processedCount++;
+        if (onProgress != null) {
+          final progress = 0.05 + (0.9 * (processedCount / totalTasks));
+          onProgress(progress, 'Processing Entry ${processedCount} of ${totalTasks}...');
+        }
       }
 
       // Safety Check: Include any NCs that might not be in the main audit_data keys (ad-hoc findings)
@@ -525,8 +543,10 @@ class ExcelExportService {
       ]);
 
       // Save and download
+      if (onProgress != null) onProgress(0.98, 'Generating Excel File...');
       final List<int> bytes = workbook.saveAsStream();
       workbook.dispose();
+      if (onProgress != null) onProgress(1.0, 'Download Starting...');
 
       _downloadExcelBytes(bytes, 'SQA_Dump_Full_${siteName.replaceAll(' ', '_')}_$auditDateStr.xlsx');
     } catch (e) {
@@ -1292,8 +1312,10 @@ class ExcelExportService {
 
       final fileName = 'SQA_Digital_Report_${siteNameText.replaceAll(' ', '_')}_${turbineNameText}_$auditDateStr.xlsx';
 
+      if (onProgress != null) onProgress(0.98, 'Generating Excel File...');
       final List<int> bytes = workbook.saveAsStream();
       workbook.dispose();
+      if (onProgress != null) onProgress(1.0, 'Download Starting...');
       _downloadExcelBytes(bytes, fileName);
     } catch (e) {
       rethrow;
@@ -1591,6 +1613,8 @@ class ExcelExportService {
     // -------------------------------------------------------------------------
     // STEP 3: Iterate sorted audits — all master data from local caches
     // -------------------------------------------------------------------------
+    final totalAudits = sortedData.length;
+    int auditsProcessed = 0;
     for (final docData in sortedData) {
       final String? auditId = docData['doc_id']?.toString();
       if (auditId == null) continue;
@@ -1822,14 +1846,21 @@ class ExcelExportService {
       ]);
       sheet2Row++;
       sheet2SrNo++;
+      auditsProcessed++;
+      if (onProgress != null) {
+        final progress = 0.2 + (0.75 * (auditsProcessed / totalAudits));
+        onProgress(progress, 'Processing Audit ${auditsProcessed} of ${totalAudits}...');
+      }
     }
 
     if (sheet1SrNo == 1) {
       sheet1.getRangeByIndex(2, 7).setText('No issues found in selected audits');
     }
 
+    if (onProgress != null) onProgress(0.98, 'Generating Excel File...');
     final List<int> bytes = workbook.saveAsStream();
     workbook.dispose();
+    if (onProgress != null) onProgress(1.0, 'Download Starting...');
     _downloadExcelBytes(bytes, 'Bulk_SQA_Dump_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.xlsx');
   }
 
