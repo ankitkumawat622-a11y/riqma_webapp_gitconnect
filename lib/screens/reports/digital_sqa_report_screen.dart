@@ -141,20 +141,20 @@ class _DigitalSqaReportScreenState extends State<DigitalSqaReportScreen> {
   Future<void> _processReferenceGroups() async {
     final tasks = widget.auditData['audit_data'] as Map<String, dynamic>? ?? {};
     
-    // Fetch reference codes from Firestore for sorting
-    final Map<String, int> referenceCodeMap = {};
+    // Fetch reference order from Firestore for sorting
+    final Map<String, int> referenceOrderMap = {};
     try {
       final refsSnapshot = await FirebaseFirestore.instance.collection('references').get();
       for (final doc in refsSnapshot.docs) {
         final data = doc.data();
         final name = data['name']?.toString() ?? '';
-        final code = data['code'];
-        if (name.isNotEmpty && code != null) {
-          referenceCodeMap[name] = code is int ? code : int.tryParse(code.toString()) ?? 999;
+        final order = data['order'] ?? data['code'];
+        if (name.isNotEmpty && order != null) {
+          referenceOrderMap[name] = order is int ? order : int.tryParse(order.toString()) ?? 999;
         }
       }
     } catch (e) {
-      debugPrint('Error fetching reference codes: $e');
+      debugPrint('Error fetching reference orders: $e');
     }
     
     // Group tasks by reference_name
@@ -215,12 +215,12 @@ class _DigitalSqaReportScreenState extends State<DigitalSqaReportScreen> {
       final ncCategory = highestSeverityTask?['nc_category']?.toString();
       final penalties = _calculatePenalties(subStatus, ncCategory);
 
-      // 4. Get reference code for sorting (default 999 for unknown)
-      final refCode = referenceCodeMap[refName] ?? 999;
+      // 4. Get reference order for sorting (default 999 for unknown)
+      final refOrder = referenceOrderMap[refName] ?? 999;
 
       groups.add(ReferenceGroup(
         referenceName: refName,
-        referenceCode: refCode,
+        referenceCode: refOrder,
         observations: observations,
         highestSubStatus: subStatus,
         ncCategory: ncCategory,

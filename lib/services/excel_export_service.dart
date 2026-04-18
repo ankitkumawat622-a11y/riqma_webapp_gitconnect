@@ -547,6 +547,7 @@ class ExcelExportService {
       final Workbook workbook = Workbook();
       final Worksheet sheet = workbook.worksheets[0];
       sheet.name = 'SQA Audit Report';
+      sheet.showGridlines = false;
 
       // -----------------------------------------------------------------------
       // 1. DATA EXTRACTION
@@ -619,6 +620,20 @@ class ExcelExportService {
       // Priority map for sub-status severity
       const subStatusPriority = {'CF': 3, 'MCF': 2, 'Aobs': 1, 'OK': 0};
 
+      // Fetch reference order for sorting
+      final Map<String, int> referenceOrderMap = {};
+      try {
+        final refsSnapshot = await FirebaseFirestore.instance.collection('references').get();
+        for (final doc in refsSnapshot.docs) {
+          final data = doc.data();
+          final name = data['name']?.toString() ?? '';
+          final order = data['order'] ?? data['code'];
+          if (name.isNotEmpty && order != null) {
+            referenceOrderMap[name] = order is int ? order : int.tryParse(order.toString()) ?? 999;
+          }
+        }
+      } catch (_) {}
+
       // Group tasks by reference_name
       final Map<String, List<Map<String, dynamic>>> groupedTasks = {};
       tasks.forEach((key, value) {
@@ -681,7 +696,16 @@ class ExcelExportService {
       int serialCounter = 1;
       int criticalNCCount = 0;
       
-      groupedTasks.forEach((refName, taskList) {
+      // Sort keys of groupedTasks based on referenceOrderMap
+      final sortedRefNames = groupedTasks.keys.toList()
+        ..sort((a, b) {
+          final orderA = referenceOrderMap[a] ?? 999;
+          final orderB = referenceOrderMap[b] ?? 999;
+          return orderA.compareTo(orderB);
+        });
+
+      for (final refName in sortedRefNames) {
+        final taskList = groupedTasks[refName]!;
         // Collect detailed points for RichText and finding info
         final List<Map<String, String>> observationPoints = [];
         for (int i = 0; i < taskList.length; i++) {
@@ -740,7 +764,7 @@ class ExcelExportService {
              'overallScore': penalties['overall']!,
            });
         }
-      });
+      }
 
       // Calculate scores
       final workmanScore = _getAssessmentScore(totalWorkmanPenalty);
@@ -752,7 +776,7 @@ class ExcelExportService {
       // 3. SET COLUMN WIDTHS
       // -----------------------------------------------------------------------
       sheet.setColumnWidthInPixels(1, 10);   // A filler
-      sheet.setColumnWidthInPixels(2, 60);   // B
+      sheet.setColumnWidthInPixels(2, 170);  // B (Set to 4.5 cm for Logo)
       sheet.setColumnWidthInPixels(3, 80);   // C
       sheet.setColumnWidthInPixels(4, 80);   // D
       sheet.setColumnWidthInPixels(5, 80);   // E
@@ -781,21 +805,37 @@ class ExcelExportService {
          range.cellStyle.borders.all.color = '#000000';
       }
 
+      void applyOutsideBorders(int r1, int c1, int r2, int c2) {
+         final range = sheet.getRangeByIndex(r1, c1, r2, c2);
+         range.cellStyle.borders.left.lineStyle = LineStyle.thin;
+         range.cellStyle.borders.left.color = '#000000';
+         range.cellStyle.borders.right.lineStyle = LineStyle.thin;
+         range.cellStyle.borders.right.color = '#000000';
+         range.cellStyle.borders.top.lineStyle = LineStyle.thin;
+         range.cellStyle.borders.top.color = '#000000';
+         range.cellStyle.borders.bottom.lineStyle = LineStyle.thin;
+         range.cellStyle.borders.bottom.color = '#000000';
+      }
+
       // -----------------------------------------------------------------------
       // Row 2 to 3 - Header Section
       // -----------------------------------------------------------------------
       sheet.getRangeByIndex(2, 2, 3, 2).merge();
+      // Set Row Heights for Header (Total 43 px = 1.14 cm)
+      sheet.setRowHeightInPixels(2, 21.5);
+      sheet.setRowHeightInPixels(3, 21.5);
+
       try {
         final ByteData data = await rootBundle.load('assets/images/renom_logo.png');
         final List<int> bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
         final Picture picture = sheet.pictures.addStream(2, 2, bytes);
-        // Scaled to fit within cell B2 (width ~60, row height ~36 total)
-        picture.height = 36;
-        picture.width = 56;
+        // Scaled to 4.5 cm width and 1.14 cm height
+        picture.height = 43;
+        picture.width = 170;
       } catch (e) {
         sheet.getRangeByIndex(2, 2).setText('Renom Logo');
       }
-      cellStyle(2, 2, bold: true, backColor: '#D5D8DC');
+      cellStyle(2, 2, bold: true, backColor: '#FFFFFF');
       
       sheet.getRangeByIndex(2, 3, 3, 8).merge();
       sheet.getRangeByIndex(2, 3).setText('SQA Audit Report');
@@ -982,7 +1022,7 @@ class ExcelExportService {
       sheet.getRangeByIndex(16, 3, 16, 4).merge();
       sheet.getRangeByIndex(16, 3).setText(auditorName);
       cellStyle(16, 3, hAlign: HAlignType.left);
-      sheet.getRangeByIndex(16, 5).setText('Auditee (PM Team) Name');
+      sheet.getRangeByIndex(16, 5).setText('PM Team Details');
       cellStyle(16, 5, bold: true, hAlign: HAlignType.left, wrapText: true);
       sheet.getRangeByIndex(16, 6, 16, 10).merge();
       sheet.getRangeByIndex(16, 6).setText(pmTeamMembers.join(', '));
@@ -1072,21 +1112,26 @@ class ExcelExportService {
           statusRange.setText(task['subStatus'].toString());
           cellStyle(startRow, 8);
           
-          // Workman Score
-          final wsRange = sheet.getRangeByIndex(startRow, 9, endRow, 9);
-          wsRange.merge();
-          wsRange.setText(task['workmanScore'].toString());
-          cellStyle(startRow, 9, fontColor: (task['workmanScore'] as int) > 0 ? '#C0392B' : null);
+          // Scores
+          final wScoreRange = sheet.getRangeByIndex(startRow, 9, endRow, 9);
+          wScoreRange.merge();
+          wScoreRange.setText(task['workmanScore'].toString());
+          cellStyle(startRow, 9, fontColor: (task['workmanScore'] as int) > 0 ? '#FF0000' : '#000000');
           
-          // Overall Score
-          final osRange = sheet.getRangeByIndex(startRow, 10, endRow, 10);
-          osRange.merge();
-          osRange.setText(task['overallScore'].toString());
-          cellStyle(startRow, 10, fontColor: (task['overallScore'] as int) > 0 ? '#C0392B' : null);
+          final oScoreRange = sheet.getRangeByIndex(startRow, 10, endRow, 10);
+          oScoreRange.merge();
+          oScoreRange.setText(task['overallScore'].toString());
+          cellStyle(startRow, 10, fontColor: (task['overallScore'] as int) > 0 ? '#FF0000' : '#000000');
+
+          // Apply outside borders for the whole group block
+          applyOutsideBorders(startRow, 2, endRow, 10);
+          // Apply internal vertical borders to separate columns
+          applyOutsideBorders(startRow, 2, endRow, 2); // Sr No
+          applyOutsideBorders(startRow, 3, endRow, 7); // Observations
+          applyOutsideBorders(startRow, 8, endRow, 8); // Status
+          applyOutsideBorders(startRow, 9, endRow, 9); // Workman
+          applyOutsideBorders(startRow, 10, endRow, 10); // Overall
           
-          // 4. Apply Borders to the whole group
-          // We apply to the whole group range. Syncfusion handles merged cells correctly.
-          applyBorders(startRow, 2, endRow, 10);
         }
       }
 

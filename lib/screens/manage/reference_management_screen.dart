@@ -27,10 +27,10 @@ class _ReferenceManagementScreenState extends State<ReferenceManagementScreen> {
       width: 200,
     ),
     PlutoColumn(
-      title: 'Code',
-      field: 'code',
-      type: PlutoColumnType.text(),
-      width: 150,
+      title: 'Order',
+      field: 'order',
+      type: PlutoColumnType.number(),
+      width: 100,
     ),
     PlutoColumn(
       title: 'Actions',
@@ -84,12 +84,22 @@ class _ReferenceManagementScreenState extends State<ReferenceManagementScreen> {
         .collection('references')
         .snapshots()
         .listen((snapshot) {
-      final newRows = snapshot.docs.map((doc) {
+      final docs = snapshot.docs;
+      // Sort docs by order field
+      docs.sort((a, b) {
+        final dataA = a.data();
+        final dataB = b.data();
+        final valA = int.tryParse((dataA['order'] ?? dataA['code'] ?? '999').toString()) ?? 999;
+        final valB = int.tryParse((dataB['order'] ?? dataB['code'] ?? '999').toString()) ?? 999;
+        return valA.compareTo(valB);
+      });
+
+      final newRows = docs.map((doc) {
         final data = doc.data();
         return PlutoRow(
           cells: {
             'name': PlutoCell(value: (data['name'] ?? 'Unknown').toString()),
-            'code': PlutoCell(value: (data['code'] ?? '').toString()),
+            'order': PlutoCell(value: int.tryParse((data['order'] ?? data['code'] ?? '').toString()) ?? 0),
             'actions': PlutoCell(value: ''),
             'id': PlutoCell(value: doc.id),
           },
@@ -112,7 +122,7 @@ class _ReferenceManagementScreenState extends State<ReferenceManagementScreen> {
 
   void _addItem() {
     final nameController = TextEditingController();
-    final codeController = TextEditingController();
+    final orderController = TextEditingController();
 
     unawaited(showDialog<void>(
       context: context,
@@ -127,8 +137,9 @@ class _ReferenceManagementScreenState extends State<ReferenceManagementScreen> {
             ),
             const SizedBox(height: 16),
             TextField(
-              controller: codeController,
-              decoration: const InputDecoration(labelText: 'Code (Optional)', border: OutlineInputBorder()),
+              controller: orderController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Order', border: OutlineInputBorder()),
             ),
           ],
         ),
@@ -144,7 +155,7 @@ class _ReferenceManagementScreenState extends State<ReferenceManagementScreen> {
               try {
                 await FirebaseFirestore.instance.collection('references').add({
                   'name': nameController.text.trim(),
-                  'code': codeController.text.trim(),
+                  'order': int.tryParse(orderController.text.trim()) ?? 0,
                   'created_at': FieldValue.serverTimestamp(),
                 });
                 if (context.mounted) {
@@ -182,7 +193,7 @@ class _ReferenceManagementScreenState extends State<ReferenceManagementScreen> {
 
       final data = doc.data()!;
       final nameController = TextEditingController(text: (data['name'] ?? '').toString());
-      final codeController = TextEditingController(text: (data['code'] ?? '').toString());
+      final orderController = TextEditingController(text: (data['order'] ?? data['code'] ?? '').toString());
 
       if (!mounted) {
         return;
@@ -201,8 +212,9 @@ class _ReferenceManagementScreenState extends State<ReferenceManagementScreen> {
               ),
               const SizedBox(height: 16),
               TextField(
-                controller: codeController,
-                decoration: const InputDecoration(labelText: 'Code (Optional)', border: OutlineInputBorder()),
+                controller: orderController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Order', border: OutlineInputBorder()),
               ),
             ],
           ),
@@ -216,7 +228,7 @@ class _ReferenceManagementScreenState extends State<ReferenceManagementScreen> {
                 try {
                   await FirebaseFirestore.instance.collection('references').doc(docId).update({
                     'name': nameController.text.trim(),
-                    'code': codeController.text.trim(),
+                    'order': int.tryParse(orderController.text.trim()) ?? 0,
                   });
                   if (context.mounted) {
                     Navigator.pop(context);
@@ -279,16 +291,16 @@ class _ReferenceManagementScreenState extends State<ReferenceManagementScreen> {
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
       filteredRows = rows.where((r) {
-        final name = r.cells['name']?.value?.toString().toLowerCase() ?? '';
-        final code = r.cells['code']?.value?.toString().toLowerCase() ?? '';
-        return name.contains(q) || code.contains(q);
+      final name = r.cells['name']?.value?.toString().toLowerCase() ?? '';
+        final order = r.cells['order']?.value?.toString().toLowerCase() ?? '';
+        return name.contains(q) || order.contains(q);
       }).toList();
     }
 
     final refsList = filteredRows.map((r) => {
       'id': r.cells['id']?.value ?? '',
       'name': r.cells['name']?.value ?? 'Unknown',
-      'code': r.cells['code']?.value ?? 'N/A',
+      'order': r.cells['order']?.value ?? '0',
     }).toList();
 
     return Container(
@@ -346,7 +358,7 @@ class _ReferenceManagementScreenState extends State<ReferenceManagementScreen> {
                           autofocus: true,
                           style: GoogleFonts.outfit(fontSize: 15),
                           decoration: InputDecoration(
-                            hintText: 'Search by name or code...',
+                            hintText: 'Search by name or order...',
                             hintStyle: GoogleFonts.outfit(fontSize: 15, color: Colors.grey.shade400),
                             prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF1A1F36)),
                             suffixIcon: IconButton(
@@ -433,7 +445,7 @@ class _ReferenceManagementScreenState extends State<ReferenceManagementScreen> {
 
   Widget _buildModernRefCard(Map<String, dynamic> ref) {
     final name = ref['name'] as String;
-    final code = (ref['code']?.toString().isEmpty ?? true) ? 'NO CODE' : ref['code'].toString();
+    final order = 'ORDER: ${ref['order']?.toString() ?? '0'}';
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
     
     return Container(
@@ -509,7 +521,7 @@ class _ReferenceManagementScreenState extends State<ReferenceManagementScreen> {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    code,
+                    order,
                     style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF3F51B5), letterSpacing: 0.5),
                   ),
                 ),
