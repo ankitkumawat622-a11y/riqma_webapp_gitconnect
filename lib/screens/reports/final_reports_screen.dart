@@ -9,14 +9,16 @@
 // - SQA Dump Excel export (Bulk & Specific)
 // =============================================================================
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:pluto_grid/pluto_grid.dart';
-
 import 'package:riqma_webapp/screens/audit_review_screen.dart';
 import 'package:riqma_webapp/services/excel_export_service.dart';
+import 'package:riqma_webapp/widgets/modern_export_overlay.dart';
 import 'package:riqma_webapp/widgets/modern_searchable_dropdown.dart';
 
 class FinalReportsScreen extends StatefulWidget {
@@ -569,21 +571,21 @@ class _FinalReportsScreenState extends State<FinalReportsScreen> {
     final state = ctx.stateManager.gridFocusNode.context?.findAncestorStateOfType<_FinalReportsScreenState>();
     final data = ctx.row.cells['data']?.value as Map<String, dynamic>;
     final auditId = ctx.row.cells['id']?.value as String;
-    if (state != null) await state._handleExport('Generating Digital SQA Report Excel...', () => ExcelExportService().generateDigitalSqaReportExcel(auditId, data));
+    if (state != null) await state._handleExport('Generating Digital SQA Report Excel...', (onProgress) => ExcelExportService().generateDigitalSqaReportExcel(auditId, data, onProgress: onProgress));
   }
 
   Future<void> _onExportNC(PlutoColumnRendererContext ctx) async {
     final state = ctx.stateManager.gridFocusNode.context?.findAncestorStateOfType<_FinalReportsScreenState>();
     final data = ctx.row.cells['data']?.value as Map<String, dynamic>;
     final auditId = ctx.row.cells['id']?.value as String;
-    if (state != null) await state._handleExport('Generating NC Tracking Excel with Images...', () => ExcelExportService().generateNCTrackingExcel(auditId, data));
+    if (state != null) await state._handleExport('Generating NC Tracking Excel with Images...', (onProgress) => ExcelExportService().generateNCTrackingExcel(auditId, data, onProgress: onProgress));
   }
 
   Future<void> _onExportSQA(PlutoColumnRendererContext ctx) async {
     final state = ctx.stateManager.gridFocusNode.context?.findAncestorStateOfType<_FinalReportsScreenState>();
     final data = ctx.row.cells['data']?.value as Map<String, dynamic>;
     final auditId = ctx.row.cells['id']?.value as String;
-    if (state != null) await state._handleExport('Generating SQA Dump...', () => ExcelExportService().generateSQADumpExcel(auditId, data));
+    if (state != null) await state._handleExport('Generating SQA Dump...', (onProgress) => ExcelExportService().generateSQADumpExcel(auditId, data, onProgress: onProgress));
   }
 
   Future<void> _onBulkExportSQA() async {
@@ -604,24 +606,36 @@ class _FinalReportsScreenState extends State<FinalReportsScreen> {
 
     await _handleExport(
       'Generating Bulk SQA Dump (${bulkData.length} Audits)...',
-      () => ExcelExportService().generateBulkSQADumpExcel(bulkData),
+      (onProgress) => ExcelExportService().generateBulkSQADumpExcel(bulkData, onProgress: onProgress),
     );
   }
 
-  Future<void> _handleExport(String loadingMessage, Future<void> Function() exportTask) async {
+  Future<void> _handleExport(String loadingMessage, Future<void> Function(void Function(double, String)) exportTask) async {
     if (_isExporting) return;
     setState(() => _isExporting = true);
-    _showLoadingSnackBar(loadingMessage);
+
+    final progressController = StreamController<ExportProgress>();
+    
+    // Show Modern Overlay
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => ModernExportOverlay(
+        initialMessage: loadingMessage,
+        progressStream: progressController.stream,
+        onDismiss: () => Navigator.of(context).pop(),
+      ),
+    ));
 
     try {
-      await exportTask();
-      if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        _showSuccess('Export Completed Successfully');
-      }
+      await exportTask((progress, message) {
+        progressController.add(ExportProgress(progress, message));
+      });
+      progressController.add(ExportProgress(1.0, 'Export Completed Successfully'));
     } catch (e) {
-      if (mounted) _showError('Export Failed: $e');
+      progressController.addError(e.toString());
     } finally {
+      await progressController.close();
       if (mounted) setState(() => _isExporting = false);
     }
   }
@@ -629,24 +643,6 @@ class _FinalReportsScreenState extends State<FinalReportsScreen> {
   // ---------------------------------------------------------------------------
   // Messaging & UI Helpers
   // ---------------------------------------------------------------------------
-  void _showLoadingSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(children: [
-          const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
-          const SizedBox(width: 16),
-          Text(message, style: GoogleFonts.outfit()),
-        ]),
-        duration: const Duration(minutes: 5), // Manual dismiss
-        backgroundColor: Colors.blue[700],
-      ),
-    );
-  }
-
-  void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message, style: GoogleFonts.outfit()), backgroundColor: Colors.green));
-  }
-
   void _showError(String message) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message, style: GoogleFonts.outfit()), backgroundColor: Colors.red));

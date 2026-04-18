@@ -122,7 +122,7 @@ class _TurbinesViewState extends State<TurbinesView> {
             'name': PlutoCell(value: (data.containsKey('turbine_name') ? data['turbine_name'] : (data.containsKey('name') ? data['name'] : 'Unknown')).toString()),
             'site': PlutoCell(value: (data.containsKey('site_name') ? data['site_name'] : 'N/A').toString()),
             'model': PlutoCell(value: (data.containsKey('model_name') ? data['model_name'] : 'N/A').toString()),
-            'wtg_category': PlutoCell(value: (data['wtg_category'] ?? 'old').toString()),
+            'wtg_category': PlutoCell(value: (data['wtg_category'] == 'old' ? 'existing' : (data['wtg_category'] ?? 'existing')).toString()),
             'actions': PlutoCell(value: ''),
             'id': PlutoCell(value: doc.id),
           },
@@ -486,7 +486,7 @@ class _TurbinesViewState extends State<TurbinesView> {
   }
 
   Future<void> _masterToggleWTGCategory(bool isNew, List<Map<String, dynamic>> visibleTurbines) async {
-    final String category = isNew ? 'new' : 'old';
+    final String category = isNew ? 'new' : 'existing';
     final batch = FirebaseFirestore.instance.batch();
     
     for (final t in visibleTurbines) {
@@ -545,7 +545,7 @@ class _TurbinesViewState extends State<TurbinesView> {
       'name': r.cells['name']?.value ?? 'Unknown',
       'model': r.cells['model']?.value ?? 'N/A',
       'site': r.cells['site']?.value ?? 'N/A',
-      'wtg_category': r.cells['wtg_category']?.value ?? 'old',
+      'wtg_category': r.cells['wtg_category']?.value == 'old' ? 'existing' : (r.cells['wtg_category']?.value ?? 'existing'),
     }).toList();
 
     final int newTurbineCount = rows.where((r) => r.cells['wtg_category']?.value == 'new').length;
@@ -867,7 +867,7 @@ class _TurbinesViewState extends State<TurbinesView> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
-                                          (turbine['wtg_category'] ?? 'old').toString().toUpperCase(),
+                                          (turbine['wtg_category'] == 'old' ? 'EXISTING' : (turbine['wtg_category'] ?? 'EXISTING')).toString().toUpperCase(),
                                           style: GoogleFonts.outfit(
                                             fontSize: 10,
                                             fontWeight: FontWeight.bold,
@@ -879,7 +879,7 @@ class _TurbinesViewState extends State<TurbinesView> {
                                           scale: 0.7,
                                           child: Switch(
                                             value: turbine['wtg_category'] == 'new',
-                                            onChanged: (val) => _updateWTGCategory(turbine['id']?.toString() ?? '', val ? 'new' : 'old'),
+                                            onChanged: (val) => _updateWTGCategory(turbine['id']?.toString() ?? '', val ? 'new' : 'existing'),
                                             activeThumbColor: Colors.orange,
                                           ),
                                         ),

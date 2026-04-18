@@ -34,7 +34,7 @@ class BulkTurbineRowData extends ChangeNotifier {
     this.modelId,
     this.modelName,
     this.modelRef,
-    this.wtgCategory = 'old',
+    this.wtgCategory = 'existing',
   });
 
   bool get isValid =>
@@ -276,8 +276,8 @@ class _BulkTurbineController extends ChangeNotifier {
       // Col 3 → WTG Category (new/old)
       if (cols.length > 3 && cols[3].trim().isNotEmpty) {
         final cat = cols[3].trim().toLowerCase();
-        if (cat == 'new' || cat == 'old') {
-          row.wtgCategory = cat;
+        if (cat == 'new' || cat == 'existing' || cat == 'old') {
+          row.wtgCategory = (cat == 'old') ? 'existing' : cat;
         }
       }
 
@@ -760,7 +760,7 @@ class _BulkTurbineEntryScreenState extends State<BulkTurbineEntryScreen> {
               ),
               const SizedBox(width: 10),
               Text(
-                'Excel column order:  Turbine Name  |  Site Name  |  Model Name  |  WTG Category (new/old)',
+                'Excel column order:  Turbine Name  |  Site Name  |  Model Name  |  WTG Category (new/existing)',
                 style: GoogleFonts.outfit(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -1086,9 +1086,9 @@ class _BulkTurbineRow extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
                               _TCategoryOption(
-                                label: 'OLD',
-                                isSelected: row.wtgCategory == 'old',
-                                onTap: () => row.setWTGCategory('old'),
+                                label: 'EXISTING',
+                                isSelected: row.wtgCategory == 'existing',
+                                onTap: () => row.setWTGCategory('existing'),
                                 color: Colors.grey,
                               ),
                               _TCategoryOption(

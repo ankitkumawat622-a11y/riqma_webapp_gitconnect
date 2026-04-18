@@ -23,7 +23,7 @@ class ExcelExportService {
     'Sr. No.', 'Financial Year', 'WTG Category', 'Turbine Name', 'Date Of Audit', 'Turbine Make', 'Turbine Model', 
     'Turbine Rating (MW)', 'Site Name', 'District Name', 'State', 'Zone', 
     'Warehouse Code', 'Customer Name', 'Main Head', 'Sub Component', 
-    'Finding/Observation', 'NC Criticality (CF/MCF/AObs)', 'Rating Category', 
+    'Finding/Observation', 'NC Criticality (CF/MCF/AObs)', 'Rating Category', 'Category of NC',
     'Reason of NC (Cause of NC)', 'Plan Date of NC closure', 'Plan of Action', 
     'Date Of Closure', 'Action Taken', 'Status', 'No. Of Days Taken', 'Auditor Name'
   ];
@@ -53,8 +53,9 @@ class ExcelExportService {
   // ===========================================================================
   
   /// Generates and downloads the NC Tracking Excel for a specific audit.
-  Future<void> generateNCTrackingExcel(String auditId, Map<String, dynamic> auditData) async {
+  Future<void> generateNCTrackingExcel(String auditId, Map<String, dynamic> auditData, {void Function(double, String)? onProgress}) async {
     try {
+      if (onProgress != null) onProgress(0.05, 'Starting NC Tracking Export...');
       final Workbook workbook = Workbook();
       final Worksheet sheet = workbook.worksheets[0];
       sheet.name = 'NC Tracking';
@@ -196,8 +197,9 @@ class ExcelExportService {
 
   /// Generates and downloads the SQA Dump Excel for a specific audit.
   /// Automatically fetches master data.
-  Future<void> generateSQADumpExcel(String auditId, Map<String, dynamic> auditData) async {
+  Future<void> generateSQADumpExcel(String auditId, Map<String, dynamic> auditData, {void Function(double, String)? onProgress}) async {
     try {
+      if (onProgress != null) onProgress(0.05, 'Preparing SQA Dump...');
       // 1. Fetch Master Data
       final masterData = await _fetchMasterData(auditData);
 
@@ -226,7 +228,7 @@ class ExcelExportService {
       final turbineNo = (auditData['turbine'] ?? '').toString();
       
       // Fetch WTG Category from 'turbines' collection if possible
-      String wtgCategory = 'old';
+      String wtgCategory = 'existing';
       try {
         final turbineSnap = await FirebaseFirestore.instance
             .collection('turbines')
@@ -234,7 +236,8 @@ class ExcelExportService {
             .limit(1)
             .get();
         if (turbineSnap.docs.isNotEmpty) {
-          wtgCategory = (turbineSnap.docs.first.data()['wtg_category'] ?? 'old').toString();
+          final cat = (turbineSnap.docs.first.data()['wtg_category'] ?? 'existing').toString().toLowerCase();
+          wtgCategory = (cat == 'old') ? 'existing' : cat;
         }
       } catch (_) {}
 
@@ -341,7 +344,7 @@ class ExcelExportService {
           criticalNCCount++;
         }
 
-        // Write row (27 columns)
+        // Write row (28 columns)
         _writeExcelRow(sheet1, rowIndex, <String>[
           srNo.toString(),
           fy,
@@ -362,6 +365,7 @@ class ExcelExportService {
           (nc?['finding'] ?? task['observation'] ?? '-').toString(),
           criticality,
           rating.toString(),
+          (nc?['nc_category'] ?? task['nc_category'] ?? '').toString(),
           rootCause,
           planDate,
           actionPlan,
@@ -537,8 +541,9 @@ class ExcelExportService {
 
   /// Generates and downloads the Digital SQA Report as an Excel file.
   /// Replicates the same format as the on-screen/PDF report.
-  Future<void> generateDigitalSqaReportExcel(String auditId, Map<String, dynamic> auditData) async {
+  Future<void> generateDigitalSqaReportExcel(String auditId, Map<String, dynamic> auditData, {void Function(double, String)? onProgress}) async {
     try {
+      if (onProgress != null) onProgress(0.05, 'Fetching Audit Metadata...');
       final Workbook workbook = Workbook();
       final Worksheet sheet = workbook.worksheets[0];
       sheet.name = 'SQA Audit Report';
@@ -1018,43 +1023,70 @@ class ExcelExportService {
         applyBorders(row, 2, row, 10);
         row++;
       } else {
+        if (onProgress != null) onProgress(0.4, 'Writing Audit Findings...');
+        int taskIdx = 0;
         for (final task in processedTasks) {
-          sheet.getRangeByIndex(row, 2).setText(task['srNo'].toString());
-          cellStyle(row, 2);
-          
-          sheet.getRangeByIndex(row, 3, row, 7).merge();
-          final range = sheet.getRangeByIndex(row, 3);
+          taskIdx++;
+          if (onProgress != null) {
+            onProgress(0.4 + (0.5 * (taskIdx / processedTasks.length)), 'Processing Finding $taskIdx of ${processedTasks.length}');
+          }
+          final int startRow = row;
           final String refName = task['refName'].toString();
           final List<Map<String, String>> points = List<Map<String, String>>.from(task['points'] as List);
-          final dynamic r = range;
-          r.richText.addText('[$refName]', Font()..bold = true..color = '#34495E');
-          for (final p in points) {
-            r.richText.addText('\n${p['text']}', Font()..color = p['color']!);
-          }
-
-          cellStyle(
-            row, 3, 
-            hAlign: HAlignType.left, 
-            wrapText: true,
-          );
           
-          sheet.getRangeByIndex(row, 8).setText(task['subStatus'].toString());
-          cellStyle(row, 8);
-          
-          sheet.getRangeByIndex(row, 9).setText(task['workmanScore'].toString());
-          cellStyle(row, 9, fontColor: (task['workmanScore'] as int) > 0 ? '#C0392B' : null);
-          
-          sheet.getRangeByIndex(row, 10).setText(task['overallScore'].toString());
-          cellStyle(row, 10, fontColor: (task['overallScore'] as int) > 0 ? '#C0392B' : null);
-          
-          applyBorders(row, 2, row, 10);
-          
-          final length = task['observation'].toString().length;
-          final lines = (length / 60).ceil();
-          if (lines > 1) {
-            sheet.setRowHeightInPixels(row, (lines * 18).toDouble());
-          }
+          // 1. Header line (Category Name)
+          sheet.getRangeByIndex(row, 3, row, 7).merge();
+          final refRange = sheet.getRangeByIndex(row, 3);
+          refRange.setText('[$refName]');
+          cellStyle(row, 3, bold: true, fontColor: '#34495E', hAlign: HAlignType.left);
           row++;
+          
+          // 2. Point lines (one per observation point)
+          for (final p in points) {
+            sheet.getRangeByIndex(row, 3, row, 7).merge();
+            final pRange = sheet.getRangeByIndex(row, 3);
+            pRange.setText(p['text']!);
+            cellStyle(row, 3, fontColor: p['color'], hAlign: HAlignType.left, wrapText: true);
+            
+            // Adjust row height for long text
+            final pLen = p['text']!.length;
+            if (pLen > 70) {
+              final lines = (pLen / 70).ceil();
+              sheet.setRowHeightInPixels(row, lines * 16.0);
+            }
+            row++;
+          }
+          
+          final int endRow = row - 1;
+          
+          // 3. Metadata Vertical Merging (Sr No, Status, Scores)
+          // Sr No
+          final srRange = sheet.getRangeByIndex(startRow, 2, endRow, 2);
+          srRange.merge();
+          srRange.setText(task['srNo'].toString());
+          cellStyle(startRow, 2);
+          
+          // Status
+          final statusRange = sheet.getRangeByIndex(startRow, 8, endRow, 8);
+          statusRange.merge();
+          statusRange.setText(task['subStatus'].toString());
+          cellStyle(startRow, 8);
+          
+          // Workman Score
+          final wsRange = sheet.getRangeByIndex(startRow, 9, endRow, 9);
+          wsRange.merge();
+          wsRange.setText(task['workmanScore'].toString());
+          cellStyle(startRow, 9, fontColor: (task['workmanScore'] as int) > 0 ? '#C0392B' : null);
+          
+          // Overall Score
+          final osRange = sheet.getRangeByIndex(startRow, 10, endRow, 10);
+          osRange.merge();
+          osRange.setText(task['overallScore'].toString());
+          cellStyle(startRow, 10, fontColor: (task['overallScore'] as int) > 0 ? '#C0392B' : null);
+          
+          // 4. Apply Borders to the whole group
+          // We apply to the whole group range. Syncfusion handles merged cells correctly.
+          applyBorders(startRow, 2, endRow, 10);
         }
       }
 
@@ -1386,12 +1418,13 @@ class ExcelExportService {
   // ===========================================================================
   // BULK EXPORT LOGIC
   // ===========================================================================
-  Future<void> generateBulkSQADumpExcel(List<Map<String, dynamic>> multiAuditData) async {
+  Future<void> generateBulkSQADumpExcel(List<Map<String, dynamic>> multiAuditData, {void Function(double, String)? onProgress}) async {
     // ---------------------------------------------------------------------------
     // Creates a 2-sheet workbook — 1:1 aggregated version of generateSQADumpExcel.
     // Sheet 1 "MIS SQA NC Details" : one row per NC task, across all audits
     // Sheet 2 "WTG Assessment"     : one summary row per audit
     // ---------------------------------------------------------------------------
+    if (onProgress != null) onProgress(0.05, 'Starting Bulk Export for ${multiAuditData.length} Audits...');
     final Workbook workbook = Workbook(2);
 
     // SHEET 1
@@ -1547,7 +1580,7 @@ class ExcelExportService {
       final fy            = auditDate != null ? _getFinancialYear(auditDate) : '';
 
       // Fetch WTG Category
-      String wtgCategory = 'old';
+      String wtgCategory = 'existing';
       try {
         final turbineSnap = await FirebaseFirestore.instance
             .collection('turbines')
@@ -1555,7 +1588,8 @@ class ExcelExportService {
             .limit(1)
             .get();
         if (turbineSnap.docs.isNotEmpty) {
-          wtgCategory = (turbineSnap.docs.first.data()['wtg_category'] ?? 'old').toString();
+          final cat = (turbineSnap.docs.first.data()['wtg_category'] ?? 'existing').toString().toLowerCase();
+          wtgCategory = (cat == 'old') ? 'existing' : cat;
         }
       } catch (_) {}
 
@@ -1641,7 +1675,7 @@ class ExcelExportService {
         totalOverallPenalty += penalties['overall']!;
         if (penalties['overall']! >= 3 || criticality == 'CF') criticalNCCount++;
 
-        // Write row (27 columns)
+        // Write row (28 columns)
         _writeExcelRow(sheet1, sheet1Row, <String>[
           sheet1SrNo.toString(),
           fy,
@@ -1662,6 +1696,7 @@ class ExcelExportService {
           (nc?['finding'] ?? task['observation'] ?? '-').toString(),
           criticality,
           rating.toString(),
+          ncCategory,
           rootCause,
           planDate,
           actionPlan,
