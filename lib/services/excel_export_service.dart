@@ -293,112 +293,87 @@ class ExcelExportService {
       final totalTasks = sortedEntries.length;
       int processedCount = 0;
 
+      final Map<String, List<Map<String, dynamic>>> groupedForScoring = {};
+
       for (final entry in sortedEntries) {
-        final taskKey = entry.key;
-        final task = entry.value as Map<String, dynamic>;
-        final nc = liveNCs[taskKey];
+          final taskKey = entry.key;
+          final task = entry.value as Map<String, dynamic>;
+          final nc = liveNCs[taskKey];
 
-        final status = (task['status'] ?? '').toString().toLowerCase();
-        final isCorrected = task['is_corrected'] == true;
+          final status = (task['status'] ?? '').toString().toLowerCase();
+          final isCorrected = task['is_corrected'] == true;
 
-        if (status == 'ok' && !isCorrected) continue;
+          if (status == 'ok' && !isCorrected) continue;
 
-        // Merge Task + NC data
-        final String criticality = (nc?['nc_criticality'] ?? task['sub_status'] ?? 'Aobs').toString();
-        final String ncCategory = (nc?['nc_category'] ?? task['nc_category'] ?? '').toString();
-        final String rootCause = (nc?['root_cause'] ?? task['root_cause'] ?? '').toString();
-        final String actionPlan = (nc?['action_plan'] ?? task['action_plan'] ?? '').toString();
-        
-        // Custom logic for OSC
-        final String actionTaken = (isCorrected 
-            ? (task['closure_remark'] ?? 'OSC Corrected')
-            : (nc?['action_taken'] ?? task['closure_remark'] ?? '')).toString();
-        
-        final String ncStatus = (isCorrected ? 'OSC Close' : (nc?['status'] ?? 'Open')).toString();
+          final String reference = (nc?['reference_name'] ?? task['reference_name'] ?? '-').toString();
+          final String criticality = (nc?['nc_criticality'] ?? task['sub_status'] ?? 'Aobs').toString();
+          final String category = (nc?['nc_category'] ?? task['nc_category'] ?? '').toString();
 
-        // Rating Category
-        int rating = 1;
-        if (criticality == 'CF') {
-          rating = 3;
-        } else if (criticality == 'MCF') {
-          rating = 2;
-        }
+          groupedForScoring.putIfAbsent(reference, () => []);
+          groupedForScoring[reference]!.add({
+            'sub_status': criticality,
+            'nc_category': category,
+          });
 
-        // Date Parsing
-        String planDate = '';
-        final targetVal = nc?['target_date'] ?? task['target_date'];
-        if (targetVal != null) {
-          final d = _parseDate(targetVal);
-          if (d != null) planDate = DateFormat('dd-MM-yyyy').format(d);
-        }
+          final String rootCause = (nc?['root_cause'] ?? task['root_cause'] ?? '').toString();
+          final String actionPlan = (nc?['action_plan'] ?? task['action_plan'] ?? '').toString();
+          final String actionTaken = (isCorrected ? (task['closure_remark'] ?? 'OSC Corrected') : (nc?['action_taken'] ?? task['closure_remark'] ?? '')).toString();
+          final String ncStatus = (isCorrected ? 'OSC Close' : (nc?['status'] ?? 'Open')).toString();
 
-        String closingDate = '';
-        final closeVal = nc?['closing_date'] ?? (isCorrected ? auditDate : null);
-        if (closeVal != null) {
-          final d = _parseDate(closeVal);
-          if (d != null) closingDate = DateFormat('dd-MM-yyyy').format(d);
-        }
+          int rating = (criticality == 'CF') ? 3 : (criticality == 'MCF' ? 2 : 1);
+          if (rating >= 3) criticalNCCount++;
 
-        // Days Taken calculation
-        int daysTaken = 0;
-        if (closeVal != null && auditDate != null) {
-          final dClose = _parseDate(closeVal);
-          if (dClose != null) {
-            daysTaken = dClose.difference(auditDate).inDays;
-            if (daysTaken < 0) daysTaken = 0;
+          String planDate = '';
+          final targetVal = nc?['target_date'] ?? task['target_date'];
+          if (targetVal != null) {
+            final d = _parseDate(targetVal);
+            if (d != null) planDate = DateFormat('dd-MM-yyyy').format(d);
           }
+          String closingDate = '';
+          final closeVal = nc?['closing_date'] ?? (isCorrected ? auditDate : null);
+          if (closeVal != null) {
+            final d = _parseDate(closeVal);
+            if (d != null) closingDate = DateFormat('dd-MM-yyyy').format(d);
+          }
+          int daysTaken = 0;
+          if (closeVal != null && auditDate != null) {
+            final dClose = _parseDate(closeVal);
+            if (dClose != null) {
+              daysTaken = dClose.difference(auditDate).inDays;
+              if (daysTaken < 0) daysTaken = 0;
+            }
+          }
+
+          _writeExcelRow(sheet1, rowIndex, <String>[
+            srNo.toString(), fy, wtgCategory, turbineNo, auditDateStr, turbineMake, turbineModel,
+            turbineRating, siteName, district, state, zone, warehouseCode, customerName,
+            (task['main_category_name'] ?? '-').toString(), (task['sub_category_name'] ?? '-').toString(),
+            (nc?['finding'] ?? task['observation'] ?? '-').toString(), criticality, rating.toString(),
+            category, rootCause, planDate, actionPlan, closingDate, actionTaken, ncStatus,
+            daysTaken.toString(), auditorName,
+          ]);
+
+          sheet1.getRangeByIndex(rowIndex, 17).cellStyle.fontColor = _getFontColorForStatus(criticality);
+
+          srNo++;
+          rowIndex++;
+          processedCount++;
+          if (onProgress != null) {
+            onProgress(0.05 + (0.9 * (processedCount / totalTasks)), 'Processing Entry ${processedCount} of ${totalTasks}...');
+          }
+      }
+
+      // Calculate final summary scores using grouping (Matches Digital SQA Report)
+      for (final refGroup in groupedForScoring.values) {
+        int maxOverall = 0;
+        int maxWorkman = 0;
+        for (final t in refGroup) {
+          final p = _calculatePenalties(t['sub_status'].toString(), t['nc_category']?.toString(), workmanPenaltyMap);
+          if (p['overall']! > maxOverall) maxOverall = p['overall']!;
+          if (p['workman']! > maxWorkman) maxWorkman = p['workman']!;
         }
-
-        // Calculate penalties
-        final penalties = _calculatePenalties(criticality, ncCategory, workmanPenaltyMap);
-        totalWorkmanPenalty += penalties['workman']!;
-        totalOverallPenalty += penalties['overall']!;
-        if (penalties['overall']! >= 3 || criticality == 'CF') {
-          criticalNCCount++;
-        }
-
-        // Write row (28 columns)
-        _writeExcelRow(sheet1, rowIndex, <String>[
-          srNo.toString(),
-          fy,
-          wtgCategory,
-          turbineNo,
-          auditDateStr,
-          turbineMake,
-          turbineModel,
-          turbineRating,
-          siteName,
-          district,
-          state,
-          zone,
-          warehouseCode,
-          customerName,
-          (task['main_category_name'] ?? '-').toString(),
-          (task['sub_category_name'] ?? '-').toString(),
-          (nc?['finding'] ?? task['observation'] ?? '-').toString(),
-          criticality,
-          rating.toString(),
-          (nc?['nc_category'] ?? task['nc_category'] ?? '').toString(),
-          rootCause,
-          planDate,
-          actionPlan,
-          closingDate,
-          actionTaken,
-          ncStatus,
-          daysTaken.toString(),
-          auditorName,
-        ]);
-
-        // Apply conditional coloring to Observation cell (Column 17)
-        sheet1.getRangeByIndex(rowIndex, 17).cellStyle.fontColor = _getFontColorForStatus(criticality);
-
-        srNo++;
-        rowIndex++;
-        processedCount++;
-        if (onProgress != null) {
-          final progress = 0.05 + (0.9 * (processedCount / totalTasks));
-          onProgress(progress, 'Processing Entry ${processedCount} of ${totalTasks}...');
-        }
+        totalOverallPenalty += maxOverall;
+        totalWorkmanPenalty += maxWorkman;
       }
 
       // Safety Check: Include any NCs that might not be in the main audit_data keys (ad-hoc findings)
@@ -726,53 +701,57 @@ class ExcelExportService {
 
       for (final refName in sortedRefNames) {
         final taskList = groupedTasks[refName]!;
+        
+        // Sort individual tasks inside the group: Workman tasks first, then by severity
+        taskList.sort((a, b) {
+          final aIsWorkman = workmanPenaltyMap[a['nc_category']?.toString()] ?? false;
+          final bIsWorkman = workmanPenaltyMap[b['nc_category']?.toString()] ?? false;
+          if (aIsWorkman != bIsWorkman) return bIsWorkman ? 1 : -1;
+          final aPriority = subStatusPriority[a['sub_status']?.toString() ?? 'Aobs'] ?? 0;
+          final bPriority = subStatusPriority[b['sub_status']?.toString() ?? 'Aobs'] ?? 0;
+          return bPriority.compareTo(aPriority);
+        });
+
         // Collect detailed points for RichText and finding info
         final List<Map<String, String>> observationPoints = [];
         for (int i = 0; i < taskList.length; i++) {
           final t = taskList[i];
-          var obsText = t['observation']?.toString() ?? t['question']?.toString() ?? '';
+          var obsText = (t['observation'] ?? t['question'] ?? '-').toString();
           if (t['is_corrected'] == true) {
             obsText += ' (Corrected on Site)';
           }
-          if (obsText.isNotEmpty) {
-            observationPoints.add({
-              'text': '${i + 1}. $obsText',
-              'color': _getFontColorForStatus(t['sub_status']?.toString() ?? 'Aobs'),
-            });
-          }
+          observationPoints.add({
+            'text': '${i + 1}. $obsText',
+            'color': _getFontColorForStatus(t['sub_status']?.toString() ?? 'Aobs'),
+          });
         }
 
-        // Find highest severity for this group
-        Map<String, dynamic>? highestSeverityTask;
-        int highestPriority = -1;
-        for (final task in taskList) {
-          // Default to Aobs for findings that lack a sub-status
-          final currentSubStatus = task['sub_status']?.toString() ?? 'Aobs';
-          final priority = subStatusPriority[currentSubStatus] ?? 0;
-          final ncCategory = task['nc_category']?.toString();
-
-          if (priority > highestPriority ||
-              (priority == highestPriority && ncCategory == 'Quality of Workmanship')) {
-            highestPriority = priority;
-            highestSeverityTask = task;
-          }
-        }
-
-        final finalSubStatus = highestSeverityTask?['sub_status']?.toString() ?? 'Aobs';
-        final finalNcCategory = highestSeverityTask?['nc_category']?.toString();
-        final penalties = _calculatePenalties(finalSubStatus, finalNcCategory, workmanPenaltyMap);
-
-        totalWorkmanPenalty += penalties['workman']!;
-        totalOverallPenalty += penalties['overall']!;
+        // Calculate independent max penalties for this group
+        int groupOverallPenalty = 0;
+        int groupWorkmanPenalty = 0;
+        String finalSubStatus = 'Aobs';
         
         for (final task in taskList) {
-          final sSub = task['sub_status']?.toString() ?? 'Aobs';
+          final sSub = (task['sub_status'] ?? 'Aobs').toString();
           final sNc = task['nc_category']?.toString();
           final p = _calculatePenalties(sSub, sNc, workmanPenaltyMap);
+          
+          if (p['overall']! > groupOverallPenalty) {
+            groupOverallPenalty = p['overall']!;
+            finalSubStatus = sSub;
+          }
+          if (p['workman']! > groupWorkmanPenalty) {
+            groupWorkmanPenalty = p['workman']!;
+          }
+          
+          // Number of CF is counted per individual finding
           if (p['overall']! >= 3 || sSub.toUpperCase() == 'CF') {
             criticalNCCount++;
           }
         }
+
+        totalWorkmanPenalty += groupWorkmanPenalty;
+        totalOverallPenalty += groupOverallPenalty;
 
         if (observationPoints.isNotEmpty) {
            processedTasks.add({
@@ -780,8 +759,8 @@ class ExcelExportService {
              'refName': refName,
              'points': observationPoints,
              'subStatus': finalSubStatus,
-             'workmanScore': penalties['workman']!,
-             'overallScore': penalties['overall']!,
+             'workmanScore': groupWorkmanPenalty,
+             'overallScore': groupOverallPenalty,
            });
         }
       }
@@ -1099,6 +1078,7 @@ class ExcelExportService {
           final refRange = sheet.getRangeByIndex(row, 3);
           refRange.setText('[$refName]');
           cellStyle(row, 3, bold: true, fontColor: '#34495E', hAlign: HAlignType.left);
+          sheet.setRowHeightInPixels(row, 0); // Hide the reference name row
           row++;
           
           // 2. Point lines (one per observation point)
@@ -1424,17 +1404,6 @@ class ExcelExportService {
   // CALCULATION HELPERS
   // ===========================================================================
   
-  Map<String, int> _calculatePenalties(String subStatus, String? ncCategory, Map<String, bool> workmanPenaltyMap) {
-    int workman = 0, overall = 0;
-    final isQualityOfWorkmanship = ncCategory != null && (workmanPenaltyMap[ncCategory] ?? false);
-
-    switch (subStatus) {
-      case 'Aobs': overall = 1; workman = isQualityOfWorkmanship ? 1 : 0; break;
-      case 'MCF':  overall = 2; workman = isQualityOfWorkmanship ? 2 : 0; break;
-      case 'CF':   overall = 3; workman = isQualityOfWorkmanship ? 3 : 0; break;
-    }
-    return {'workman': workman, 'overall': overall};
-  }
 
   /// Returns font color based on NC Category (sub_status).
   String _getFontColorForStatus(String subStatus) {
@@ -1442,6 +1411,21 @@ class ExcelExportService {
     if (status == 'MCF') return '#0000FF'; // Blue
     if (status == 'CF') return '#FF0000'; // Red
     return '#000000'; // Black for Aobs, etc.
+  }
+
+  Map<String, int> _calculatePenalties(String subStatus, String? ncCategory, Map<String, bool> workmanPenaltyMap) {
+    int overall = 1;
+    switch (subStatus) {
+      case 'CF':  overall = 3; break;
+      case 'MCF': overall = 2; break;
+      default:    overall = 1;
+    }
+    
+    final bool isWorkman = workmanPenaltyMap[ncCategory] ?? false;
+    return {
+      'overall': overall,
+      'workman': isWorkman ? overall : 0,
+    };
   }
 
   double _getAssessmentScore(int penaltyPoints) {
@@ -1782,7 +1766,7 @@ class ExcelExportService {
         sheet1Row++;
       }
 
-      // Sheet 2 — one summary row per audit
+      // Sheet 2 — one summary row per audit using grouped scores
       final overallScore      = _getAssessmentScore(totalOverallPenalty);
       final workmanScore      = _getAssessmentScore(totalWorkmanPenalty);
       final overallCompliance = _getCompliancePercentage(totalOverallPenalty);

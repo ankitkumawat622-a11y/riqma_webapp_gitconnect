@@ -1,9 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
-class AuditSummaryReportScreen extends StatelessWidget {
+class AuditSummaryReportScreen extends StatefulWidget {
   final String auditId;
   final Map<String, dynamic> auditData;
   final Map<String, String> masterData; // turbine info, site info, etc.
@@ -16,40 +17,151 @@ class AuditSummaryReportScreen extends StatelessWidget {
   });
 
   @override
+  State<AuditSummaryReportScreen> createState() => _AuditSummaryReportScreenState();
+}
+
+class _ScrollIntent extends Intent {
+  final AxisDirection direction;
+  const _ScrollIntent({required this.direction});
+}
+
+class _AuditSummaryReportScreenState extends State<AuditSummaryReportScreen> {
+  bool _isMetadataExpanded = true;
+  final ScrollController _horizontalController = ScrollController();
+  final ScrollController _verticalController = ScrollController();
+  final FocusNode _focusNode = FocusNode();
+  Map<String, bool> _workmanPenaltyMap = {};
+  Map<String, Map<String, dynamic>> _ncMap = {};
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAllData();
+  }
+
+  Future<void> _loadAllData() async {
+    await Future.wait([
+      _fetchConfig(),
+      _fetchNCs(),
+    ]);
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  Future<void> _fetchNCs() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('ncs')
+          .where('audit_ref', isEqualTo: FirebaseFirestore.instance.doc('/audit_submissions/${widget.auditId}'))
+          .get();
+      
+      final Map<String, Map<String, dynamic>> mapping = {};
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final key = data['task_key']?.toString();
+        if (key != null) mapping[key] = data;
+      }
+      _ncMap = mapping;
+    } catch (_) {}
+  }
+
+  Future<void> _fetchConfig() async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('audit_configs').doc('nc_categories').get();
+      if (doc.exists) {
+        final Map<String, bool> mapping = {};
+        final items = doc.data()?['items'] as List<dynamic>? ?? [];
+        for (final item in items) {
+          final name = (item as Map)['name']?.toString() ?? '';
+          mapping[name] = item['is_workman_penalty'] == true;
+        }
+        _workmanPenaltyMap = mapping;
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _horizontalController.dispose();
+    _verticalController.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _handleKeyboardScroll(AxisDirection direction) {
+    if (!_verticalController.hasClients || !_horizontalController.hasClients) return;
+    
+    const double step = 100.0;
+    if (direction == AxisDirection.up) {
+      _verticalController.animateTo((_verticalController.offset - step).clamp(0, _verticalController.position.maxScrollExtent), duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
+    } else if (direction == AxisDirection.down) {
+      _verticalController.animateTo((_verticalController.offset + step).clamp(0, _verticalController.position.maxScrollExtent), duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
+    } else if (direction == AxisDirection.left) {
+      _horizontalController.animateTo((_horizontalController.offset - step).clamp(0, _horizontalController.position.maxScrollExtent), duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
+    } else if (direction == AxisDirection.right) {
+      _horizontalController.animateTo((_horizontalController.offset + step).clamp(0, _horizontalController.position.maxScrollExtent), duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final DateTime auditDate = _parseDate(auditData['timestamp']) ?? DateTime.now();
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF1A1F36),
+        body: Center(child: CircularProgressIndicator(color: Colors.white)),
+      );
+    }
+
+    final DateTime auditDate = _parseDate(widget.auditData['timestamp']) ?? DateTime.now();
     final String fy = _getFinancialYear(auditDate);
     final tasks = _getNotOkTasks();
     final metrics = _calculateMetrics(tasks);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FA),
-      appBar: AppBar(
-        title: Text(
-          'Audit Summary Report',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 20),
-        ),
-        backgroundColor: const Color(0xFF1A1F36),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Column(
-        children: [
-          // 1. TOP 30% - PRIMARY DATA GRID
-          _buildPrimaryDataHeader(context, auditDate, fy),
-
-          // 2. MIDDLE STRIP - METRICS
-          _buildMetricsStrip(metrics),
-
-          // 3. BOTTOM 70% - NC DATA TABLE
-          Expanded(
-            child: _buildNCTable(tasks),
+    return Shortcuts(
+      shortcuts: {
+        LogicalKeySet(LogicalKeyboardKey.arrowUp): const _ScrollIntent(direction: AxisDirection.up),
+        LogicalKeySet(LogicalKeyboardKey.arrowDown): const _ScrollIntent(direction: AxisDirection.down),
+        LogicalKeySet(LogicalKeyboardKey.arrowLeft): const _ScrollIntent(direction: AxisDirection.left),
+        LogicalKeySet(LogicalKeyboardKey.arrowRight): const _ScrollIntent(direction: AxisDirection.right),
+      },
+      child: Actions(
+        actions: {
+          _ScrollIntent: CallbackAction<_ScrollIntent>(onInvoke: (intent) {
+            _handleKeyboardScroll(intent.direction);
+            return null;
+          }),
+        },
+        child: Focus(
+          focusNode: _focusNode,
+          autofocus: true,
+          child: Scaffold(
+            backgroundColor: const Color(0xFFF4F7FA),
+            appBar: AppBar(
+              title: Text(
+                'Audit Summary Report',
+                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              backgroundColor: const Color(0xFF1A1F36),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              centerTitle: false,
+              leadingWidth: 40,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            body: Column(
+              children: [
+                _buildPrimaryDataHeader(context, auditDate, fy),
+                _buildMetricsStrip(metrics),
+                Expanded(
+                  child: _buildNCTable(tasks),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -57,67 +169,121 @@ class AuditSummaryReportScreen extends StatelessWidget {
   Widget _buildPrimaryDataHeader(BuildContext context, DateTime auditDate, String fy) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-      decoration: const BoxDecoration(
-        color: Color(0xFF1A1F36),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFFE0F2FE),
+            const Color(0xFFBAE6FD),
+          ],
         ),
-      ),
-      child: Column(
-        children: [
-          _buildSectionHeader('Primary Metadata'),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _buildMetaCard('Audit Date', DateFormat('dd.MM.yyyy').format(auditDate), Icons.calendar_month_rounded, Colors.blue),
-              _buildMetaCard('Financial Year', fy, Icons.history_edu_rounded, Colors.orange),
-              _buildMetaCard('Turbine Name', (auditData['turbine'] ?? '').toString(), Icons.precision_manufacturing_rounded, Colors.teal),
-              _buildMetaCard('Turbine Make', masterData['turbine_make'] ?? '', Icons.factory_rounded, Colors.cyan),
-              _buildMetaCard('Rating (MW)', masterData['turbine_rating'] ?? '', Icons.bolt_rounded, Colors.amber),
-              _buildMetaCard('Model', masterData['turbine_model'] ?? '', Icons.model_training_rounded, Colors.indigo),
-              _buildMetaCard('Site Name', (auditData['site'] ?? '').toString(), Icons.location_on_rounded, Colors.redAccent),
-              _buildMetaCard('State', (auditData['state'] ?? '').toString(), Icons.map_rounded, Colors.purple),
-              _buildMetaCard('District', masterData['district'] ?? '', Icons.location_city_rounded, Colors.blueGrey),
-              _buildMetaCard('Warehouse', masterData['warehouse_code'] ?? '', Icons.warehouse_rounded, Colors.brown),
-              _buildMetaCard('Zone', masterData['zone'] ?? '', Icons.explore_rounded, Colors.green),
-              _buildMetaCard('Customer', (auditData['customer_name'] ?? '').toString(), Icons.business_rounded, Colors.blueAccent),
-              _buildMetaCard('Auditor', (auditData['auditor_name'] ?? '').toString(), Icons.person_rounded, Colors.deepPurple),
-              _buildMetaCard('DOC', _formatDate(auditData['commissioning_date']), Icons.event_available_rounded, Colors.lightGreen),
-              _buildMetaCard('DOT', _formatDate(auditData['date_of_take_over']), Icons.handshake_rounded, Colors.deepOrange),
-              _buildMetaCard('PM Plan', _formatDate(auditData['plan_date_of_maintenance']), Icons.edit_calendar_rounded, Colors.blueGrey),
-              _buildMetaCard('PM Done', _formatDate(auditData['actual_date_of_maintenance']), Icons.task_alt_rounded, Colors.green),
-              _buildMetaCard('PM Adherence', _calculateAdherence(), Icons.timer_rounded, Colors.red),
-              _buildMetaCard('QA vs PM Aging', _calculateAging(auditDate), Icons.hourglass_bottom_rounded, Colors.orangeAccent),
-              _buildMetaCard('PM Type', (auditData['maintenance_type'] ?? '').toString(), Icons.settings_suggest_rounded, Colors.indigoAccent),
-            ],
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
+        border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1.5),
       ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Column(
+          children: [
+            InkWell(
+              onTap: () => setState(() => _isMetadataExpanded = !_isMetadataExpanded),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildSectionHeader('Primary Metadata'),
+                    Icon(
+                      _isMetadataExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                      color: const Color(0xFF0369A1),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            AnimatedCrossFade(
+              firstChild: const SizedBox(width: double.infinity),
+              secondChild: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _buildMetaCard('Audit Date', DateFormat('dd.MM.yyyy').format(auditDate), Icons.calendar_month_rounded, Colors.blue),
+                    _buildMetaCard('Financial Year', fy, Icons.history_edu_rounded, Colors.orange),
+                    _buildMetaCard('Turbine Name', (widget.auditData['turbine'] ?? '').toString(), Icons.precision_manufacturing_rounded, Colors.teal),
+                    _buildMetaCard('Turbine Make', widget.masterData['turbine_make'] ?? '', Icons.factory_rounded, Colors.cyan),
+                    _buildMetaCard('Rating (MW)', widget.masterData['turbine_rating'] ?? '', Icons.bolt_rounded, Colors.amber),
+                    _buildMetaCard('Model', widget.masterData['turbine_model'] ?? '', Icons.model_training_rounded, Colors.indigo),
+                    _buildMetaCard('Site Name', (widget.auditData['site'] ?? '').toString(), Icons.location_on_rounded, Colors.redAccent),
+                    _buildMetaCard('State', (widget.auditData['state'] ?? '').toString(), Icons.map_rounded, Colors.purple),
+                    _buildMetaCard('District', widget.masterData['district'] ?? '', Icons.location_city_rounded, Colors.blueGrey),
+                    _buildMetaCard('Warehouse', widget.masterData['warehouse_code'] ?? '', Icons.warehouse_rounded, Colors.brown),
+                    _buildMetaCard('Zone', widget.masterData['zone'] ?? '', Icons.explore_rounded, Colors.green),
+                    _buildMetaCard('Customer', (widget.auditData['customer_name'] ?? '').toString(), Icons.business_rounded, Colors.blueAccent),
+                    _buildMetaCard('Auditor', (widget.auditData['auditor_name'] ?? '').toString(), Icons.person_rounded, Colors.deepPurple),
+                    _buildMetaCard('DOC', _formatDate(widget.auditData['commissioning_date']), Icons.event_available_rounded, Colors.lightGreen),
+                    _buildMetaCard('DOT', _formatDate(widget.auditData['date_of_take_over']), Icons.handshake_rounded, Colors.deepOrange),
+                    _buildMetaCard('PM Plan', _formatDate(widget.auditData['plan_date_of_maintenance']), Icons.edit_calendar_rounded, Colors.blueGrey),
+                    _buildMetaCard('PM Done', _formatDate(widget.auditData['actual_date_of_maintenance']), Icons.task_alt_rounded, Colors.green),
+                    _buildMetaCard('PM Adherence', _calculateAdherence(), Icons.timer_rounded, Colors.red),
+                    _buildMetaCard('QA vs PM Aging', _calculateAging(auditDate), Icons.hourglass_bottom_rounded, Colors.orangeAccent),
+                    _buildMetaCard('PM Type', (widget.auditData['maintenance_type'] ?? '').toString(), Icons.settings_suggest_rounded, Colors.indigoAccent),
+                  ],
+                ),
+              ),
+              crossFadeState: _isMetadataExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 300),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Row(
+      children: [
+        Container(width: 3, height: 14, decoration: BoxDecoration(color: const Color(0xFF0284C7), borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 8),
+        Text(title, style: GoogleFonts.outfit(color: const Color(0xFF0369A1), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.3)),
+      ],
     );
   }
 
   Widget _buildMetaCard(String label, String value, IconData icon, Color color) {
     return Container(
-      width: 175,
+      width: 165,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
+        color: Colors.white.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+        border: Border.all(color: Colors.white, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.2),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, size: 16, color: color),
+            child: Icon(icon, size: 14, color: color),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -125,10 +291,10 @@ class AuditSummaryReportScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(label, style: GoogleFonts.outfit(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w500)),
+                Text(label, style: GoogleFonts.outfit(color: const Color(0xFF64748B), fontSize: 9, fontWeight: FontWeight.w500)),
                 Text(
                   value.isEmpty ? '-' : value,
-                  style: GoogleFonts.outfit(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.outfit(color: const Color(0xFF1E293B), fontSize: 11, fontWeight: FontWeight.bold),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
@@ -142,7 +308,7 @@ class AuditSummaryReportScreen extends StatelessWidget {
   Widget _buildMetricsStrip(Map<String, dynamic> metrics) {
     return Container(
       height: 70,
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -161,7 +327,7 @@ class AuditSummaryReportScreen extends StatelessWidget {
           _buildMetricBadge('CF', metrics['count_cf'], Colors.red.shade900),
           _buildMetricBadge('MCF', metrics['count_mcf'], Colors.blue.shade900),
           _buildMetricBadge('Aobs', metrics['count_aobs'], Colors.blueGrey),
-          _buildScoreBadge('SQA Score', metrics['overall_score'] as double, metrics['overall_compliance'] as double, Colors.teal),
+          _buildScoreBadge('Overall', metrics['overall_score'] as double, metrics['overall_compliance'] as double, Colors.teal),
           _buildScoreBadge('Workman', metrics['workman_score'] as double, metrics['workman_compliance'] as double, Colors.indigo),
         ],
       ),
@@ -223,67 +389,162 @@ class AuditSummaryReportScreen extends StatelessWidget {
       );
     }
 
+    const double colTask = 250;
+    const double colFinding = 300;
+    const double colCrit = 100;
+    const double colRef = 200;
+    const double colCat = 150;
+    const double colMat = 150;
+    const double colRoot = 150;
+    const double colPlan = 200;
+    const double colTarget = 110;
+    const double colTaken = 200;
+    const double colClose = 110;
+    const double colStatus = 120;
+    
+    final totalWidth = colTask + colFinding + colCrit + colRef + colCat + colMat + colRoot + colPlan + colTarget + colTaken + colClose + colStatus;
+
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
+      child: Scrollbar(
+        controller: _horizontalController,
+        thumbVisibility: true,
+        thickness: 8,
+        radius: const Radius.circular(4),
         child: SingleChildScrollView(
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
-            columnSpacing: 24,
-            horizontalMargin: 20,
-            columns: [
-              _buildTableColumn('Task Name'),
-              _buildTableColumn('Finding'),
-              _buildTableColumn('Criticality'),
-              _buildTableColumn('Reference'),
-              _buildTableColumn('NC Category'),
-              _buildTableColumn('Material Details'),
-              _buildTableColumn('Root Cause'),
-              _buildTableColumn('Action Plan'),
-              _buildTableColumn('Target Date'),
-              _buildTableColumn('Action Taken'),
-              _buildTableColumn('Closing Date'),
-              _buildTableColumn('Status'),
-            ],
-            rows: tasks.map((task) => _buildTableRow(task)).toList(),
+          controller: _horizontalController,
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: totalWidth,
+            child: Column(
+              children: [
+                // Sticky Header Row
+                Container(
+                  color: const Color(0xFFF8FAFC),
+                  child: Table(
+                    columnWidths: const {
+                      0: FixedColumnWidth(colTask),
+                      1: FixedColumnWidth(colFinding),
+                      2: FixedColumnWidth(colCrit),
+                      3: FixedColumnWidth(colRef),
+                      4: FixedColumnWidth(colCat),
+                      5: FixedColumnWidth(colMat),
+                      6: FixedColumnWidth(colRoot),
+                      7: FixedColumnWidth(colPlan),
+                      8: FixedColumnWidth(colTarget),
+                      9: FixedColumnWidth(colTaken),
+                      10: FixedColumnWidth(colClose),
+                      11: FixedColumnWidth(colStatus),
+                    },
+                    children: [
+                      TableRow(
+                        children: [
+                          _buildTableHeaderCell('Task Name'),
+                          _buildTableHeaderCell('Finding'),
+                          _buildTableHeaderCell('Criticality'),
+                          _buildTableHeaderCell('Reference'),
+                          _buildTableHeaderCell('NC Category'),
+                          _buildTableHeaderCell('Material Details'),
+                          _buildTableHeaderCell('Root Cause'),
+                          _buildTableHeaderCell('Action Plan'),
+                          _buildTableHeaderCell('Target Date'),
+                          _buildTableHeaderCell('Action Taken'),
+                          _buildTableHeaderCell('Closing Date'),
+                          _buildTableHeaderCell('Status'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, thickness: 1),
+                // Scrollable Body
+                Expanded(
+                  child: Scrollbar(
+                    controller: _verticalController,
+                    thumbVisibility: true,
+                    thickness: 8,
+                    radius: const Radius.circular(4),
+                    child: SingleChildScrollView(
+                      controller: _verticalController,
+                      child: Table(
+                        columnWidths: const {
+                          0: FixedColumnWidth(colTask),
+                          1: FixedColumnWidth(colFinding),
+                          2: FixedColumnWidth(colCrit),
+                          3: FixedColumnWidth(colRef),
+                          4: FixedColumnWidth(colCat),
+                          5: FixedColumnWidth(colMat),
+                          6: FixedColumnWidth(colRoot),
+                          7: FixedColumnWidth(colPlan),
+                          8: FixedColumnWidth(colTarget),
+                          9: FixedColumnWidth(colTaken),
+                          10: FixedColumnWidth(colClose),
+                          11: FixedColumnWidth(colStatus),
+                        },
+                        border: TableBorder(
+                          horizontalInside: BorderSide(color: Colors.grey.shade100, width: 1),
+                        ),
+                        children: tasks.map((task) => _buildTableDataRow(task)).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  DataColumn _buildTableColumn(String label) {
-    return DataColumn(
-      label: Text(label, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF475569))),
+  Widget _buildTableHeaderCell(String label) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Text(
+        label,
+        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF475569)),
+      ),
     );
   }
 
-  DataRow _buildTableRow(Map<String, dynamic> task) {
+  TableRow _buildTableDataRow(Map<String, dynamic> task) {
     final bool isMaterial = task['root_cause'] == 'Material Not Available';
     final criticality = (task['nc_criticality'] ?? task['sub_status'] ?? 'Aobs').toString();
-    
-    return DataRow(
-      cells: [
-        DataCell(Text((task['task_name'] ?? task['question'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12))),
-        DataCell(SizedBox(width: 250, child: Text((task['finding'] ?? task['observation'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis))),
-        DataCell(_buildCriticalityBadge(criticality)),
-        DataCell(Text((task['reference_name'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12, color: Colors.blue.shade700))),
-        DataCell(Text((task['nc_category'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12, color: Colors.purple.shade700))),
-        DataCell(_buildMaterialCell(isMaterial, task)),
-        DataCell(Text((task['root_cause'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12))),
-        DataCell(SizedBox(width: 200, child: Text((task['action_plan'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12)))),
-        DataCell(Text(_formatDate(task['target_date']), style: GoogleFonts.outfit(fontSize: 12))),
-        DataCell(SizedBox(width: 200, child: Text((task['action_taken'] ?? task['closure_remark'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12)))),
-        DataCell(Text(_formatDate(task['closing_date']), style: GoogleFonts.outfit(fontSize: 12))),
-        DataCell(_buildStatusBadge(task)),
+
+    return TableRow(
+      children: [
+        _buildTableCell(Text((task['task_name'] ?? task['question'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12))),
+        _buildTableCell(Text((task['finding'] ?? task['observation'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12), maxLines: 3, overflow: TextOverflow.ellipsis)),
+        _buildTableCell(_buildCriticalityBadge(criticality)),
+        _buildTableCell(Text((task['reference_name'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12, color: Colors.blue.shade700))),
+        _buildTableCell(Text((task['nc_category'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12, color: Colors.purple.shade700))),
+        _buildTableCell(_buildMaterialCell(isMaterial, task)),
+        _buildTableCell(Text((task['root_cause'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12))),
+        _buildTableCell(Text((task['action_plan'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12))),
+        _buildTableCell(Text(_formatDate(task['target_date']), style: GoogleFonts.outfit(fontSize: 12))),
+        _buildTableCell(Text((task['action_taken'] ?? task['closure_remark'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12))),
+        _buildTableCell(Text(_formatDate(task['closing_date']), style: GoogleFonts.outfit(fontSize: 12))),
+        _buildTableCell(_buildStatusBadge(task)),
       ],
+    );
+  }
+
+  Widget _buildTableCell(Widget child) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: child,
+      ),
     );
   }
 
@@ -334,51 +595,68 @@ class AuditSummaryReportScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Row(
-      children: [
-        Container(width: 4, height: 16, decoration: BoxDecoration(color: Colors.blue, borderRadius: BorderRadius.circular(2))),
-        const SizedBox(width: 8),
-        Text(title, style: GoogleFonts.outfit(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-      ],
-    );
-  }
-
   // --- LOGIC HELPERS ---
 
   List<Map<String, dynamic>> _getNotOkTasks() {
     final List<Map<String, dynamic>> results = [];
-    final auditDataMap = auditData['audit_data'] as Map<String, dynamic>? ?? {};
+    final auditDataMap = widget.auditData['audit_data'] as Map<String, dynamic>? ?? {};
     
-    // Sort keys numerically
-    final keys = auditDataMap.keys.toList();
-    keys.sort((a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0));
-
-    for (final key in keys) {
-      final task = auditDataMap[key] as Map<String, dynamic>;
+    auditDataMap.forEach((key, value) {
+      final task = value as Map<String, dynamic>;
       final status = task['status']?.toString().toLowerCase();
-      final isCorrected = task['is_corrected'] == true;
+      final isOsc = task['is_corrected'] == true;
 
-      if (status != 'ok' || isCorrected) {
+      if (status != 'ok' || isOsc) {
+        // Merge with live NC data if exists
+        final liveNc = _ncMap[key] ?? {};
         results.add({
           ...task,
+          ...liveNc,
           'task_key': key,
         });
       }
-    }
+    });
+
+    // Deep Match Sorting Logic: Reference Group -> Penalty Priority -> Criticality
+    results.sort((a, b) {
+      final refA = (a['reference_name'] ?? '-').toString();
+      final refB = (b['reference_name'] ?? '-').toString();
+      final refComp = refA.compareTo(refB);
+      if (refComp != 0) return refComp;
+
+      // Same Reference - Check Penalty Priority
+      final catA = (a['nc_category'] ?? '').toString();
+      final catB = (b['nc_category'] ?? '').toString();
+      final bool isWorkmanA = _workmanPenaltyMap[catA] ?? (catA == 'Service' || catA == 'Quality of Workmanship');
+      final bool isWorkmanB = _workmanPenaltyMap[catB] ?? (catB == 'Service' || catB == 'Quality of Workmanship');
+      
+      if (isWorkmanA && !isWorkmanB) return -1;
+      if (!isWorkmanA && isWorkmanB) return 1;
+
+      // Same Penalty status - Check Criticality
+      final critA = (a['nc_criticality'] ?? a['sub_status'] ?? 'Aobs').toString();
+      final critB = (b['nc_criticality'] ?? b['sub_status'] ?? 'Aobs').toString();
+      final pA = (critA == 'CF') ? 3 : (critA == 'MCF' ? 2 : 1);
+      final pB = (critB == 'CF') ? 3 : (critB == 'MCF' ? 2 : 1);
+      return pB.compareTo(pA); // Higher penalty first
+    });
+
     return results;
   }
 
   Map<String, dynamic> _calculateMetrics(List<Map<String, dynamic>> notOkTasks) {
     int cf = 0, mcf = 0, aobs = 0, material = 0, osc = 0, workman = 0;
-    int totalOverallPenalty = 0;
-    int totalWorkmanPenalty = 0;
+    
+    // Grouping for penalty scores
+    final Map<String, List<Map<String, dynamic>>> groupedForScoring = {};
 
     for (final task in notOkTasks) {
       final crit = (task['nc_criticality'] ?? task['sub_status'] ?? 'Aobs').toString();
       final cat = (task['nc_category'] ?? '').toString();
       final root = (task['root_cause'] ?? '').toString();
-      
+      final ref = (task['reference_name'] ?? '-').toString();
+
+      // Individual Counters (Task-based)
       if (crit == 'CF') {
         cf++;
       } else if (crit == 'MCF') {
@@ -394,25 +672,40 @@ class AuditSummaryReportScreen extends StatelessWidget {
         osc++;
       }
       
-      // Workman Logic
-      final isWorkman = cat == 'Quality of Workmanship'; // Simplified for summary UI
+      // Workman Task Count (Purple Box)
+      final bool isWorkman = _workmanPenaltyMap.isEmpty 
+          ? (cat == 'Service' || cat == 'Quality of Workmanship') 
+          : (_workmanPenaltyMap[cat] ?? false);
+
       if (isWorkman) {
         workman++;
       }
 
-      int p = 0;
-      if (crit == 'CF') {
-        p = 3;
-      } else if (crit == 'MCF') {
-        p = 2;
-      } else {
-        p = 1;
+      // Grouping for penalty calculation
+      groupedForScoring.putIfAbsent(ref, () => []);
+      groupedForScoring[ref]!.add(task);
+    }
+
+    // Calculate final penalties using grouping (Matches Digital Report)
+    int totalOverallPenalty = 0;
+    int totalWorkmanPenalty = 0;
+
+    for (final refGroup in groupedForScoring.values) {
+      int maxOverall = 0;
+      int maxWorkman = 0;
+      for (final t in refGroup) {
+        final crit = (t['nc_criticality'] ?? t['sub_status'] ?? 'Aobs').toString();
+        final cat = (t['nc_category'] ?? '').toString();
+        final bool isWorkman = _workmanPenaltyMap.isEmpty 
+            ? (cat == 'Service' || cat == 'Quality of Workmanship') 
+            : (_workmanPenaltyMap[cat] ?? false);
+
+        int p = (crit == 'CF') ? 3 : (crit == 'MCF' ? 2 : 1);
+        if (p > maxOverall) maxOverall = p;
+        if (isWorkman && p > maxWorkman) maxWorkman = p;
       }
-      
-      totalOverallPenalty += p;
-      if (isWorkman) {
-        totalWorkmanPenalty += p;
-      }
+      totalOverallPenalty += maxOverall;
+      totalWorkmanPenalty += maxWorkman;
     }
 
     final double oScore = _getAssessmentScore(totalOverallPenalty);
@@ -452,15 +745,15 @@ class AuditSummaryReportScreen extends StatelessWidget {
   }
 
   String _calculateAdherence() {
-    final plan = _parseDate(auditData['plan_date_of_maintenance']);
-    final done = _parseDate(auditData['actual_date_of_maintenance']);
+    final plan = _parseDate(widget.auditData['plan_date_of_maintenance']);
+    final done = _parseDate(widget.auditData['actual_date_of_maintenance']);
     if (plan == null || done == null) return '-';
     final diff = done.difference(plan).inDays;
     return diff == 0 ? 'On Time' : '${diff > 0 ? '+' : ''}$diff Days';
   }
 
   String _calculateAging(DateTime auditDate) {
-    final done = _parseDate(auditData['actual_date_of_maintenance']);
+    final done = _parseDate(widget.auditData['actual_date_of_maintenance']);
     if (done == null) return '-';
     final diff = auditDate.difference(done).inDays;
     return '$diff Days';
@@ -483,3 +776,4 @@ class AuditSummaryReportScreen extends StatelessWidget {
     return '${year - 1}-${year.toString().substring(2)}';
   }
 }
+

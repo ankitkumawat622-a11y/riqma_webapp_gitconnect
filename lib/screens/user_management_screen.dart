@@ -188,6 +188,61 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     }
   }
 
+  Widget _buildModernTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool obscureText = false,
+    TextInputType? keyboardType,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscureText,
+        keyboardType: keyboardType,
+        style: GoogleFonts.outfit(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: const Color(0xFF1A1F36),
+        ),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: GoogleFonts.outfit(
+            fontSize: 12,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+          prefixIcon: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: Colors.grey[600], size: 18),
+            ),
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          floatingLabelBehavior: FloatingLabelBehavior.auto,
+        ),
+      ),
+    );
+  }
+
   void _showAddUserDialog() {
     final nameController = TextEditingController();
     final emailController = TextEditingController();
@@ -203,34 +258,30 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           content: SizedBox(
             width: 500,
             child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 8),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextField(
+                  _buildModernTextField(
                     controller: nameController,
-                    decoration: InputDecoration(
-                      labelText: 'Name',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
+                    label: 'Full Name',
+                    icon: Icons.person_outline_rounded,
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
+                  const SizedBox(height: 20),
+                  _buildModernTextField(
                     controller: emailController,
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
+                    label: 'Email Address',
+                    icon: Icons.email_outlined,
+                    keyboardType: TextInputType.emailAddress,
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
+                  const SizedBox(height: 20),
+                  _buildModernTextField(
                     controller: passwordController,
+                    label: 'Password',
+                    icon: Icons.lock_outline_rounded,
                     obscureText: true,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   ModernSearchableDropdown(
                     label: 'Role',
                     value: selectedRole,
@@ -241,7 +292,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                       if (value != null) setDialogState(() => selectedRole = value);
                     },
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   if (_states.isNotEmpty)
                     ModernSearchableDropdown(
                       label: 'Assigned State',
@@ -312,18 +363,16 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         builder: (context, setDialogState) => AlertDialog(
           title: Text('Edit User', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
           content: SizedBox(
-            width: 400,
+            width: 450,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
+                _buildModernTextField(
                   controller: nameController,
-                  decoration: InputDecoration(
-                    labelText: 'Name',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
+                  label: 'Full Name',
+                  icon: Icons.person_outline_rounded,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 if (_states.isNotEmpty)
                   ModernSearchableDropdown(
                     label: 'Assigned State',

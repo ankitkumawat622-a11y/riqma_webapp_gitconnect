@@ -219,25 +219,36 @@ class MISService {
     int totalOverallPenalty = 0;
     int totalWorkmanPenalty = 0;
 
+    // Grouping logic for scoring consistency
+    final Map<String, List<Map<String, dynamic>>> groupedForScoring = {};
+
     for (final entry in tasks.entries) {
       final taskKey = entry.key;
       final task = entry.value as Map<String, dynamic>;
       final nc = ncs[taskKey];
 
-      final criticality = (nc?['nc_criticality'] ?? task['sub_status'] ?? 'Aobs').toString();
-      final ncCategory = (nc?['nc_category'] ?? task['nc_category'] ?? '').toString();
+      final String reference = (nc?['reference_name'] ?? task['reference_name'] ?? '-').toString();
+      final String criticality = (nc?['nc_criticality'] ?? task['sub_status'] ?? 'Aobs').toString();
+      final String ncCategory = (nc?['nc_category'] ?? task['nc_category'] ?? '').toString();
 
-      int workman = 0, overall = 0;
-      final isWorkman = workmanPenaltyMap[ncCategory] ?? false;
+      groupedForScoring.putIfAbsent(reference, () => []);
+      groupedForScoring[reference]!.add({
+        'sub_status': criticality,
+        'nc_category': ncCategory,
+      });
+    }
 
-      switch (criticality) {
-        case 'Aobs': overall = 1; workman = isWorkman ? 1 : 0; break;
-        case 'MCF':  overall = 2; workman = isWorkman ? 2 : 0; break;
-        case 'CF':   overall = 3; workman = isWorkman ? 3 : 0; break;
+    // Calculate final penalties using grouping (Matches Digital Report)
+    for (final refGroup in groupedForScoring.values) {
+      int maxOverall = 0;
+      int maxWorkman = 0;
+      for (final t in refGroup) {
+        final p = _calculatePenalties(t['sub_status'].toString(), t['nc_category']?.toString(), workmanPenaltyMap);
+        if (p['overall']! > maxOverall) maxOverall = p['overall']!;
+        if (p['workman']! > maxWorkman) maxWorkman = p['workman']!;
       }
-
-      totalOverallPenalty += overall;
-      totalWorkmanPenalty += workman;
+      totalOverallPenalty += maxOverall;
+      totalWorkmanPenalty += maxWorkman;
     }
 
     final double overallScore = _getAssessmentScore(totalOverallPenalty);
@@ -321,11 +332,10 @@ class MISService {
   }
 
   Future<Map<String, bool>> _fetchWorkmanPenaltyMap() async {
-    Map<String, bool> res = {'Quality of Workmanship': true};
+    Map<String, bool> res = {}; // Dynamic map
     try {
       final snap = await _firestore.collection('audit_configs').doc('nc_categories').get();
       if (snap.exists) {
-        res = {};
         for (final item in (snap.data()?['items'] as List<dynamic>? ?? [])) {
           final name = (item as Map)['name']?.toString() ?? '';
           res[name] = item['is_workman_penalty'] == true;
@@ -333,6 +343,21 @@ class MISService {
       }
     } catch (_) {}
     return res;
+  }
+
+  Map<String, int> _calculatePenalties(String subStatus, String? ncCategory, Map<String, bool> workmanPenaltyMap) {
+    int overall = 1;
+    switch (subStatus) {
+      case 'CF':  overall = 3; break;
+      case 'MCF': overall = 2; break;
+      default:    overall = 1;
+    }
+    
+    final bool isWorkman = workmanPenaltyMap[ncCategory] ?? false;
+    return {
+      'overall': overall,
+      'workman': isWorkman ? overall : 0,
+    };
   }
 
   double _getAssessmentScore(int penaltyPoints) {

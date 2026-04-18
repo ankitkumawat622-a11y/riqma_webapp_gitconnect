@@ -31,6 +31,7 @@ class _ApprovedPlansDashboardState extends State<ApprovedPlansDashboard> {
   // Master Data
   Map<String, String> _auditorMap = {};
   Map<String, String> _modelMakeMap = {};
+  Map<String, String> _modelNameToMakeMap = {};
 
   @override
   void initState() {
@@ -54,14 +55,24 @@ class _ApprovedPlansDashboardState extends State<ApprovedPlansDashboard> {
       // Fetch Models (for Make lookup)
       final modelsSnap = await FirebaseFirestore.instance.collection('turbinemodel').get();
       final Map<String, String> models = {};
+      final Map<String, String> modelNames = {};
       for (final doc in modelsSnap.docs) {
-        models[doc.id] = (doc.data()['turbine_make'] ?? 'Unknown').toString();
+        final data = doc.data();
+        final make = (data['turbine_make'] ?? 'Unknown').toString();
+        models[doc.id] = make;
+        final name = data['turbine_model']?.toString() ?? data['model_name']?.toString() ?? data['model']?.toString() ?? data['name']?.toString();
+        if (name != null) {
+          modelNames[name.trim()] = make;
+          // Also store lowercase for case-insensitive lookup
+          modelNames[name.trim().toLowerCase()] = make;
+        }
       }
 
       if (mounted) {
         setState(() {
           _auditorMap = auditors;
           _modelMakeMap = models;
+          _modelNameToMakeMap = modelNames;
         });
       }
     } catch (e) {
@@ -352,7 +363,7 @@ class _ApprovedPlansDashboardState extends State<ApprovedPlansDashboard> {
               (context, index) {
                 final doc = filteredDocs[index];
                 final data = doc.data() as Map<String, dynamic>;
-                return ApprovedPlanCard(docId: doc.id, data: data, makeMap: _modelMakeMap);
+                return ApprovedPlanCard(docId: doc.id, data: data, makeMap: _modelMakeMap, nameToMakeMap: _modelNameToMakeMap);
               },
               childCount: filteredDocs.length,
             ),
@@ -410,12 +421,14 @@ class ApprovedPlanCard extends StatefulWidget {
   final String docId;
   final Map<String, dynamic> data;
   final Map<String, String> makeMap;
+  final Map<String, String> nameToMakeMap;
 
   const ApprovedPlanCard({
     super.key,
     required this.docId,
     required this.data,
     required this.makeMap,
+    required this.nameToMakeMap,
   });
 
   @override
@@ -434,12 +447,14 @@ class _ApprovedPlanCardState extends State<ApprovedPlanCard> {
     
     final siteName = widget.data['site_name']?.toString() ?? 'Unknown Site';
     final state = widget.data['state']?.toString() ?? 'State';
-    final model = widget.data['turbine_model']?.toString() ?? 'Model';
+    final modelRaw = widget.data['turbine_model']?.toString() ?? 'Model';
+    final model = modelRaw.trim();
     final modelId = widget.data['turbine_model_id']?.toString();
     
-    // Resolve Make: Priority 1: Data field 'turbine_make', Priority 2: Lookup via modelId, Priority 3: Data field 'make'
+    // Resolve Make: Priority 1: Data field 'turbine_make', Priority 2: Lookup via modelId, Priority 3: Lookup via modelName, Priority 4: Data field 'make'
     final make = widget.data['turbine_make']?.toString() ?? 
                  (modelId != null ? widget.makeMap[modelId] : null) ?? 
+                 (model != 'Model' ? (widget.nameToMakeMap[model] ?? widget.nameToMakeMap[model.toLowerCase()]) : null) ??
                  widget.data['make']?.toString() ?? 
                  'Manufacturer';
                  

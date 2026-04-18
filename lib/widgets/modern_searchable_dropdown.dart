@@ -83,7 +83,7 @@ class _ModernSearchableDropdownState extends State<ModernSearchableDropdown> {
           child: Opacity(
             opacity: widget.enabled ? 1.0 : 0.5,
             child: Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize: widget.compact ? MainAxisSize.min : MainAxisSize.max,
               children: [
                 Container(
                   padding: EdgeInsets.all(widget.compact ? 4 : 8),

@@ -94,6 +94,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
     _turbineMakeController.text = (localAuditData['turbine_make'] ?? widget.auditData['turbine_make'] ?? '').toString();
 
     _fetchModelDetails(); // Auto-populate Make/Rating
+    _fetchLocationDetails(); // Auto-populate District/Warehouse/Zone
     
     _commissioningDate = _parseDate(localAuditData['commissioning_date']);
     _dateOfTakeOver = _parseDate(localAuditData['date_of_take_over']);
@@ -650,6 +651,64 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
     }
   }
 
+  Future<void> _fetchLocationDetails() async {
+    final siteName = (localAuditData['site'] ?? widget.auditData['site'])?.toString();
+    final stateName = (localAuditData['state'] ?? widget.auditData['state'])?.toString();
+
+    try {
+      // 1. Try Site Collection (Highest Priority for District/Warehouse)
+      if (siteName != null && siteName.isNotEmpty) {
+        final siteSnap = await FirebaseFirestore.instance
+            .collection('sites')
+            .where('site_name', isEqualTo: siteName)
+            .limit(1)
+            .get();
+
+        if (siteSnap.docs.isNotEmpty && mounted) {
+          final data = siteSnap.docs.first.data();
+          setState(() {
+            if ((localAuditData['district'] ?? '').toString().isEmpty) {
+              localAuditData['district'] = data['district'] ?? data['district_name'];
+            }
+            if ((localAuditData['warehouse_code'] ?? '').toString().isEmpty) {
+              localAuditData['warehouse_code'] = data['warehouse_code'];
+            }
+            if ((localAuditData['zone'] ?? '').toString().isEmpty) {
+              localAuditData['zone'] = data['zone'];
+            }
+          });
+        }
+      }
+
+      // 2. Try State Collection (Fallback for Zone, or if user stores District there)
+      if (stateName != null && stateName.isNotEmpty) {
+        final stateSnap = await FirebaseFirestore.instance
+            .collection('states')
+            .where('state', isEqualTo: stateName)
+            .limit(1)
+            .get();
+
+        if (stateSnap.docs.isNotEmpty && mounted) {
+          final data = stateSnap.docs.first.data();
+          setState(() {
+            if ((localAuditData['zone'] ?? '').toString().isEmpty) {
+              localAuditData['zone'] = data['zone'];
+            }
+            // Fallback for district/warehouse if they exist in states collection as per user request
+            if ((localAuditData['district'] ?? '').toString().isEmpty) {
+              localAuditData['district'] = data['district'];
+            }
+            if ((localAuditData['warehouse_code'] ?? '').toString().isEmpty) {
+              localAuditData['warehouse_code'] = data['warehouse_code'];
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching location details: $e');
+    }
+  }
+
   List<MapEntry<String, dynamic>> _getSortedTasks() {
     final auditDataMap = localAuditData['audit_data'] as Map<String, dynamic>? ?? {};
     final entries = auditDataMap.entries.toList();
@@ -665,8 +724,18 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
 
   Future<void> _updateAuditStatus(String newStatus) async {
     try {
+      final currentStatus = localAuditData['status']?.toString().toLowerCase() ?? 'submitted';
+      final isReopen = currentStatus == 'approved' && newStatus == 'correction';
+
       if (newStatus == 'correction' || newStatus == 'rejected') {
-        final remark = await _showRejectionRemarkDialog();
+        // Validation: Ensure Maintenance Type and Stage are selected before sending for correction
+        if (_maintenanceType == null || _assessmentStage == null) {
+          ToastService.error('Please select Maintenance Type and Assessment Stage first');
+          _showMaintenanceDetailsDialog();
+          return;
+        }
+
+        final remark = await _showRejectionRemarkDialog(isReopen: isReopen);
         if (remark == null || remark.isEmpty) return; // User cancelled or empty
 
         if (!mounted) return;
@@ -708,8 +777,10 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
         // Mandatory Notification Add
         await FirebaseFirestore.instance.collection('notifications').add({
           'targetUserId': widget.auditData['auditor_id'] ?? widget.auditData['userId'],
-          'title': 'Audit Correction Needed',
-          'message': 'Audit for ${localAuditData['turbine_id'] ?? 'Turbine'} has been sent back at ${DateFormat('hh:mm a').format(DateTime.now())}: $remark',
+          'title': isReopen ? 'Audit Re-opened for Correction' : 'Audit Correction Needed',
+          'message': isReopen 
+            ? 'Audit for ${localAuditData['turbine_id'] ?? 'Turbine'} has been re-opened for correction: $remark'
+            : 'Audit for ${localAuditData['turbine_id'] ?? 'Turbine'} has been sent back for correction: $remark',
           'timestamp': FieldValue.serverTimestamp(),
           'isRead': false,
           'type': 'audit_correction',
@@ -812,14 +883,14 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
     );
   }
 
-  Future<String?> _showRejectionRemarkDialog() async {
+  Future<String?> _showRejectionRemarkDialog({bool isReopen = false}) async {
     final TextEditingController remarkController = TextEditingController();
     return showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Mandatory Master Remark', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        title: Text(isReopen ? 'Re-open Audit for Correction' : 'Mandatory Master Remark', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -853,8 +924,8 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
               }
               Navigator.pop(context, remarkController.text.trim());
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red[600]),
-            child: Text('Confirm Rejection', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(backgroundColor: isReopen ? Colors.orange[800] : Colors.red[600]),
+            child: Text(isReopen ? 'Confirm Re-open' : 'Confirm Rejection', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -2206,6 +2277,18 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
     final subStatus = item['sub_status'] ?? '';
     final String? refId = item['reference_id']?.toString();
     final referenceName = _refIdToName[refId] ?? item['reference_name'] ?? item['referenceoftask'] ?? '';
+    
+    // Resolve ID from name if needed (handles cases where name was stored instead of ID)
+    String? resolvedRefId = refId;
+    if (resolvedRefId == null || !_refIdToName.containsKey(resolvedRefId)) {
+      for (final entry in _refIdToName.entries) {
+        if (entry.value == (resolvedRefId ?? referenceName)) {
+          resolvedRefId = entry.key;
+          break;
+        }
+      }
+    }
+    
     final observation = item['observation'] ?? '';
     
     final photosList = item['photos'] is List ? item['photos'] as List : <dynamic>[];
@@ -2415,7 +2498,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
                             label: 'Reference',
                             compact: true,
                             showLabel: false,
-                            value: _refIdToName.containsKey(refId) ? refId : null,
+                            value: _refIdToName.containsKey(resolvedRefId) ? resolvedRefId : null,
                             items: _refIdToName,
                             color: Colors.blueGrey,
                             icon: Icons.menu_book_rounded,
