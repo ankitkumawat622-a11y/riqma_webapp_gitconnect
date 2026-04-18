@@ -135,7 +135,7 @@ class _AuditorSelfReviewScreenState extends State<AuditorSelfReviewScreen> {
       _showAutomaticRemarkPopupIfNeeded();
       ActivityLogService.instance.log(
         actionType: ActivityActionType.auditStart,
-        description: 'Started/Resumed audit review for ${widget.auditData['turbine_id'] ?? widget.auditData['turbine'] ?? 'Unknown Turbine'}',
+        description: 'Started/Resumed audit review for ${widget.auditData['turbine'] ?? widget.auditData['turbine_id'] ?? 'Unknown Turbine'}',
         metadata: {
           'auditId': widget.documentId,
           'turbineId': widget.auditData['turbine_id'] ?? widget.auditData['turbine'],

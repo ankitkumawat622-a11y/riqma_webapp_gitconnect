@@ -134,7 +134,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
       _showAutomaticRemarkPopupIfNeeded();
       ActivityLogService.instance.log(
         actionType: ActivityActionType.auditStart,
-        description: 'Manager started reviewing audit for ${widget.auditData['turbine_id'] ?? widget.auditData['turbine'] ?? 'Unknown Turbine'}',
+        description: 'Manager started reviewing audit for ${widget.auditData['turbine'] ?? widget.auditData['turbine_id'] ?? 'Unknown Turbine'}',
         metadata: {
           'auditId': widget.auditId,
           'turbineId': widget.auditData['turbine_id'] ?? widget.auditData['turbine'],
@@ -709,7 +709,7 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
         await FirebaseFirestore.instance.collection('notifications').add({
           'targetUserId': widget.auditData['auditor_id'] ?? widget.auditData['userId'],
           'title': 'Audit Correction Needed',
-          'message': 'Audit for ${localAuditData['turbine_id'] ?? 'Turbine'} has been sent back: $remark',
+          'message': 'Audit for ${localAuditData['turbine_id'] ?? 'Turbine'} has been sent back at ${DateFormat('hh:mm a').format(DateTime.now())}: $remark',
           'timestamp': FieldValue.serverTimestamp(),
           'isRead': false,
           'type': 'audit_correction',
@@ -750,8 +750,8 @@ class _AuditReviewScreenState extends State<AuditReviewScreen> {
       await ActivityLogService.instance.log(
         actionType: actionType,
         description: newStatus == 'approved' 
-            ? 'Approved audit report for ${localAuditData['turbine_id'] ?? localAuditData['turbine'] ?? 'Unknown'}'
-            : 'Rejected audit report (correction needed) for ${localAuditData['turbine_id'] ?? localAuditData['turbine'] ?? 'Unknown'}',
+            ? 'Approved audit report for ${localAuditData['turbine'] ?? localAuditData['turbine_id'] ?? 'Unknown'}'
+            : 'Rejected audit report (correction needed) for ${localAuditData['turbine'] ?? localAuditData['turbine_id'] ?? 'Unknown'}',
         metadata: {
           'auditId': widget.auditId,
           'status': newStatus,
