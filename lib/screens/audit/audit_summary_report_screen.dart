@@ -598,11 +598,9 @@ class _AuditSummaryReportScreenState extends State<AuditSummaryReportScreen> {
         case 'sub_cat':
           cmp = (a['sub_category_name'] ?? '').toString().compareTo((b['sub_category_name'] ?? '').toString());
           break;
-        case 'ref':
-          final orderA = _referenceOrderMap[a['reference_name']] ?? 999;
-          final orderB = _referenceOrderMap[b['reference_name']] ?? 999;
+          final orderA = _referenceOrderMap[a['reference_name_unified']] ?? 999;
+          final orderB = _referenceOrderMap[b['reference_name_unified']] ?? 999;
           cmp = orderA.compareTo(orderB);
-          break;
         case 'crit':
           final pA = (a['nc_criticality'] ?? a['sub_status'] ?? 'Aobs') == 'CF' ? 3 : ((a['nc_criticality'] ?? a['sub_status'] ?? 'Aobs') == 'MCF' ? 2 : 1);
           final pB = (b['nc_criticality'] ?? b['sub_status'] ?? 'Aobs') == 'CF' ? 3 : ((b['nc_criticality'] ?? b['sub_status'] ?? 'Aobs') == 'MCF' ? 2 : 1);
@@ -720,18 +718,26 @@ class _AuditSummaryReportScreenState extends State<AuditSummaryReportScreen> {
       if (status != 'ok' || isOsc) {
         // Merge with live NC data if exists
         final liveNc = _ncMap[key] ?? {};
+        
+        // Critical: Unify the grouping key logic to match Excel exactly
+        final refName = (liveNc['reference_name']?.toString() ??
+                        task['reference_name']?.toString() ??
+                        task['referenceoftask']?.toString() ??
+                        'Uncategorized').trim();
+
         results.add({
           ...task,
           ...liveNc,
           'task_key': key,
+          'reference_name_unified': refName, // Store for consistent calculation
         });
       }
     });
 
     // Deep Match Sorting Logic: Reference Group -> Penalty Priority -> Criticality
     results.sort((a, b) {
-      final refA = (a['reference_name'] ?? '-').toString();
-      final refB = (b['reference_name'] ?? '-').toString();
+      final refA = a['reference_name_unified'].toString();
+      final refB = b['reference_name_unified'].toString();
       final refComp = refA.compareTo(refB);
       if (refComp != 0) return refComp;
 
@@ -765,7 +771,7 @@ class _AuditSummaryReportScreenState extends State<AuditSummaryReportScreen> {
       final crit = (task['nc_criticality'] ?? task['sub_status'] ?? 'Aobs').toString();
       final cat = (task['nc_category'] ?? '').toString();
       final root = (task['root_cause'] ?? '').toString();
-      final ref = (task['reference_name'] ?? '-').toString();
+      final ref = task['reference_name_unified'].toString();
 
       // Individual Counters (Task-based)
       if (crit == 'CF') {

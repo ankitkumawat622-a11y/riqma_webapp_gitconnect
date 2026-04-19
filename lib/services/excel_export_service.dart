@@ -641,10 +641,10 @@ class ExcelExportService {
         // Include if Not OK, Corrected, or if an NC document exists for this task
         // Exclude 'OK' and 'NA' checklist points that are not findings
         if ((status != 'ok' && status != 'na' && status != 'n/a') || isCorrected || nc != null) {
-          final refName = nc?['reference_name']?.toString() ??
+          final refName = (nc?['reference_name']?.toString() ??
               task['reference_name']?.toString() ??
               task['referenceoftask']?.toString() ??
-              'Uncategorized';
+              'Uncategorized').trim();
               
           // Create a merged task for grouping to prioritize live NC data
           final mergedTask = Map<String, dynamic>.from(task);
@@ -677,7 +677,7 @@ class ExcelExportService {
            groupedTasks[refName]!.add({
              'observation': nc['finding'] ?? '-',
              'sub_status': nc['nc_criticality'] ?? 'Aobs',
-             'nc_category': nc['nc_category'] ?? '-',
+             'nc_category': nc?['nc_category'] ?? '-',
              'reference_name': refName,
              'is_corrected': false, // Ad-hoc findings are usually not auto-corrected
              'task_key': key,
