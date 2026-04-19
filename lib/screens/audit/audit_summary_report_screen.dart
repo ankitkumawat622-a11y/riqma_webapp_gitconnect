@@ -32,7 +32,12 @@ class _AuditSummaryReportScreenState extends State<AuditSummaryReportScreen> {
   final FocusNode _focusNode = FocusNode();
   Map<String, bool> _workmanPenaltyMap = {};
   Map<String, Map<String, dynamic>> _ncMap = {};
+  Map<String, int> _referenceOrderMap = {};
   bool _isLoading = true;
+
+  // Sorting State
+  String _sortColumn = 'main_cat'; // default
+  bool _sortAscending = true;
 
   @override
   void initState() {
@@ -44,8 +49,25 @@ class _AuditSummaryReportScreenState extends State<AuditSummaryReportScreen> {
     await Future.wait([
       _fetchConfig(),
       _fetchNCs(),
+      _fetchReferences(),
     ]);
     if (mounted) setState(() => _isLoading = false);
+  }
+
+  Future<void> _fetchReferences() async {
+    try {
+      final snap = await FirebaseFirestore.instance.collection('references').get();
+      final Map<String, int> mapping = {};
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final name = data['name']?.toString() ?? '';
+        final order = data['order'] ?? data['code'];
+        if (name.isNotEmpty && order != null) {
+          mapping[name] = order is int ? order : int.tryParse(order.toString()) ?? 999;
+        }
+      }
+      _referenceOrderMap = mapping;
+    } catch (_) {}
   }
 
   Future<void> _fetchNCs() async {
@@ -389,20 +411,22 @@ class _AuditSummaryReportScreenState extends State<AuditSummaryReportScreen> {
       );
     }
 
-    const double colTask = 250;
-    const double colFinding = 300;
+    const double colTask = 220;
+    const double colFinding = 250;
+    const double colMainCat = 150;
+    const double colSubCat = 150;
     const double colCrit = 100;
-    const double colRef = 200;
+    const double colRef = 180;
     const double colCat = 150;
     const double colMat = 150;
     const double colRoot = 150;
     const double colPlan = 200;
     const double colTarget = 110;
-    const double colTaken = 200;
+    const double colTaken = 180;
     const double colClose = 110;
-    const double colStatus = 120;
+    const double colStatus = 110;
     
-    final totalWidth = colTask + colFinding + colCrit + colRef + colCat + colMat + colRoot + colPlan + colTarget + colTaken + colClose + colStatus;
+    final totalWidth = colTask + colFinding + colMainCat + colSubCat + colCrit + colRef + colCat + colMat + colRoot + colPlan + colTarget + colTaken + colClose + colStatus;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -434,32 +458,36 @@ class _AuditSummaryReportScreenState extends State<AuditSummaryReportScreen> {
                     columnWidths: const {
                       0: FixedColumnWidth(colTask),
                       1: FixedColumnWidth(colFinding),
-                      2: FixedColumnWidth(colCrit),
-                      3: FixedColumnWidth(colRef),
-                      4: FixedColumnWidth(colCat),
-                      5: FixedColumnWidth(colMat),
-                      6: FixedColumnWidth(colRoot),
-                      7: FixedColumnWidth(colPlan),
-                      8: FixedColumnWidth(colTarget),
-                      9: FixedColumnWidth(colTaken),
-                      10: FixedColumnWidth(colClose),
-                      11: FixedColumnWidth(colStatus),
+                      2: FixedColumnWidth(colMainCat),
+                      3: FixedColumnWidth(colSubCat),
+                      4: FixedColumnWidth(colCrit),
+                      5: FixedColumnWidth(colRef),
+                      6: FixedColumnWidth(colCat),
+                      7: FixedColumnWidth(colMat),
+                      8: FixedColumnWidth(colRoot),
+                      9: FixedColumnWidth(colPlan),
+                      10: FixedColumnWidth(colTarget),
+                      11: FixedColumnWidth(colTaken),
+                      12: FixedColumnWidth(colClose),
+                      13: FixedColumnWidth(colStatus),
                     },
                     children: [
                       TableRow(
                         children: [
-                          _buildTableHeaderCell('Task Name'),
-                          _buildTableHeaderCell('Finding'),
-                          _buildTableHeaderCell('Criticality'),
-                          _buildTableHeaderCell('Reference'),
-                          _buildTableHeaderCell('NC Category'),
-                          _buildTableHeaderCell('Material Details'),
-                          _buildTableHeaderCell('Root Cause'),
-                          _buildTableHeaderCell('Action Plan'),
-                          _buildTableHeaderCell('Target Date'),
-                          _buildTableHeaderCell('Action Taken'),
-                          _buildTableHeaderCell('Closing Date'),
-                          _buildTableHeaderCell('Status'),
+                          _buildSortableHeader('Task Name', 'task'),
+                          _buildSortableHeader('Finding', 'finding'),
+                          _buildSortableHeader('Main Category', 'main_cat'),
+                          _buildSortableHeader('Sub Category', 'sub_cat'),
+                          _buildSortableHeader('Crit.', 'crit'),
+                          _buildSortableHeader('Reference', 'ref'),
+                          _buildSortableHeader('NC Category', 'nc_cat'),
+                          _buildSortableHeader('Material', 'mat'),
+                          _buildSortableHeader('Root Cause', 'root'),
+                          _buildSortableHeader('Action Plan', 'plan'),
+                          _buildSortableHeader('Target', 'target'),
+                          _buildSortableHeader('Action Taken', 'taken'),
+                          _buildSortableHeader('Closing', 'closing'),
+                          _buildSortableHeader('Status', 'status'),
                         ],
                       ),
                     ],
@@ -479,21 +507,23 @@ class _AuditSummaryReportScreenState extends State<AuditSummaryReportScreen> {
                         columnWidths: const {
                           0: FixedColumnWidth(colTask),
                           1: FixedColumnWidth(colFinding),
-                          2: FixedColumnWidth(colCrit),
-                          3: FixedColumnWidth(colRef),
-                          4: FixedColumnWidth(colCat),
-                          5: FixedColumnWidth(colMat),
-                          6: FixedColumnWidth(colRoot),
-                          7: FixedColumnWidth(colPlan),
-                          8: FixedColumnWidth(colTarget),
-                          9: FixedColumnWidth(colTaken),
-                          10: FixedColumnWidth(colClose),
-                          11: FixedColumnWidth(colStatus),
+                          2: FixedColumnWidth(colMainCat),
+                          3: FixedColumnWidth(colSubCat),
+                          4: FixedColumnWidth(colCrit),
+                          5: FixedColumnWidth(colRef),
+                          6: FixedColumnWidth(colCat),
+                          7: FixedColumnWidth(colMat),
+                          8: FixedColumnWidth(colRoot),
+                          9: FixedColumnWidth(colPlan),
+                          10: FixedColumnWidth(colTarget),
+                          11: FixedColumnWidth(colTaken),
+                          12: FixedColumnWidth(colClose),
+                          13: FixedColumnWidth(colStatus),
                         },
                         border: TableBorder(
                           horizontalInside: BorderSide(color: Colors.grey.shade100, width: 1),
                         ),
-                        children: tasks.map((task) => _buildTableDataRow(task)).toList(),
+                        children: _getSortedTasksForDisplay(tasks).map((task) => _buildTableDataRow(task)).toList(),
                       ),
                     ),
                   ),
@@ -506,14 +536,93 @@ class _AuditSummaryReportScreenState extends State<AuditSummaryReportScreen> {
     );
   }
 
-  Widget _buildTableHeaderCell(String label) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Text(
-        label,
-        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF475569)),
+  Widget _buildSortableHeader(String label, String column) {
+    final bool isSelected = _sortColumn == column;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          if (_sortColumn == column) {
+            _sortAscending = !_sortAscending;
+          } else {
+            _sortColumn = column;
+            _sortAscending = true;
+          }
+        });
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                label,
+                style: GoogleFonts.outfit(
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  fontSize: 12,
+                  color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (isSelected) ...[
+              const SizedBox(width: 4),
+              Icon(
+                _sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                size: 14,
+                color: const Color(0xFF0F172A),
+              ),
+            ],
+          ],
+        ),
       ),
     );
+  }
+
+  List<Map<String, dynamic>> _getSortedTasksForDisplay(List<Map<String, dynamic>> tasks) {
+    final List<Map<String, dynamic>> sorted = List.from(tasks);
+    sorted.sort((a, b) {
+      int cmp = 0;
+      switch (_sortColumn) {
+        case 'main_cat':
+          final aVal = (a['main_category_name'] ?? '').toString();
+          final bVal = (b['main_category_name'] ?? '').toString();
+          cmp = aVal.compareTo(bVal);
+          if (cmp == 0) {
+            final asub = (a['sub_category_name'] ?? '').toString();
+            final bsub = (b['sub_category_name'] ?? '').toString();
+            cmp = asub.compareTo(bsub);
+          }
+          break;
+        case 'sub_cat':
+          cmp = (a['sub_category_name'] ?? '').toString().compareTo((b['sub_category_name'] ?? '').toString());
+          break;
+        case 'ref':
+          final orderA = _referenceOrderMap[a['reference_name']] ?? 999;
+          final orderB = _referenceOrderMap[b['reference_name']] ?? 999;
+          cmp = orderA.compareTo(orderB);
+          break;
+        case 'crit':
+          final pA = (a['nc_criticality'] ?? a['sub_status'] ?? 'Aobs') == 'CF' ? 3 : ((a['nc_criticality'] ?? a['sub_status'] ?? 'Aobs') == 'MCF' ? 2 : 1);
+          final pB = (b['nc_criticality'] ?? b['sub_status'] ?? 'Aobs') == 'CF' ? 3 : ((b['nc_criticality'] ?? b['sub_status'] ?? 'Aobs') == 'MCF' ? 2 : 1);
+          cmp = pA.compareTo(pB);
+          break;
+        case 'task':
+          cmp = (a['task_name'] ?? a['question'] ?? '').toString().compareTo((b['task_name'] ?? b['question'] ?? '').toString());
+          break;
+        case 'finding':
+          cmp = (a['finding'] ?? a['observation'] ?? '').toString().compareTo((b['finding'] ?? b['observation'] ?? '').toString());
+          break;
+        case 'status':
+          cmp = (a['status'] ?? '').toString().compareTo((b['status'] ?? '').toString());
+          break;
+        default:
+          cmp = 0;
+      }
+      return _sortAscending ? cmp : -cmp;
+    });
+    return sorted;
   }
 
   TableRow _buildTableDataRow(Map<String, dynamic> task) {
@@ -522,17 +631,19 @@ class _AuditSummaryReportScreenState extends State<AuditSummaryReportScreen> {
 
     return TableRow(
       children: [
-        _buildTableCell(Text((task['task_name'] ?? task['question'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12))),
-        _buildTableCell(Text((task['finding'] ?? task['observation'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12), maxLines: 3, overflow: TextOverflow.ellipsis)),
+        _buildTableCell(Text((task['task_name'] ?? task['question'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 11))),
+        _buildTableCell(Text((task['finding'] ?? task['observation'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 11), maxLines: 4, overflow: TextOverflow.ellipsis)),
+        _buildTableCell(Text((task['main_category_name'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 11, color: Colors.blueGrey.shade700))),
+        _buildTableCell(Text((task['sub_category_name'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 11, color: Colors.blueGrey.shade500))),
         _buildTableCell(_buildCriticalityBadge(criticality)),
-        _buildTableCell(Text((task['reference_name'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12, color: Colors.blue.shade700))),
-        _buildTableCell(Text((task['nc_category'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12, color: Colors.purple.shade700))),
+        _buildTableCell(Text((task['reference_name'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 11, color: Colors.blue.shade700))),
+        _buildTableCell(Text((task['nc_category'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 11, color: Colors.purple.shade700))),
         _buildTableCell(_buildMaterialCell(isMaterial, task)),
-        _buildTableCell(Text((task['root_cause'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12))),
-        _buildTableCell(Text((task['action_plan'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12))),
-        _buildTableCell(Text(_formatDate(task['target_date']), style: GoogleFonts.outfit(fontSize: 12))),
-        _buildTableCell(Text((task['action_taken'] ?? task['closure_remark'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 12))),
-        _buildTableCell(Text(_formatDate(task['closing_date']), style: GoogleFonts.outfit(fontSize: 12))),
+        _buildTableCell(Text((task['root_cause'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 11))),
+        _buildTableCell(Text((task['action_plan'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 11))),
+        _buildTableCell(Text(_formatDate(task['target_date']), style: GoogleFonts.outfit(fontSize: 11))),
+        _buildTableCell(Text((task['action_taken'] ?? task['closure_remark'] ?? '-').toString(), style: GoogleFonts.outfit(fontSize: 11))),
+        _buildTableCell(Text(_formatDate(task['closing_date']), style: GoogleFonts.outfit(fontSize: 11))),
         _buildTableCell(_buildStatusBadge(task)),
       ],
     );

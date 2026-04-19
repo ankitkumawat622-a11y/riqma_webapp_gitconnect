@@ -702,14 +702,20 @@ class ExcelExportService {
       for (final refName in sortedRefNames) {
         final taskList = groupedTasks[refName]!;
         
-        // Sort individual tasks inside the group: Workman tasks first, then by severity
+        // Sort individual tasks inside the group: Penalty Priority -> Criticality
         taskList.sort((a, b) {
-          final aIsWorkman = workmanPenaltyMap[a['nc_category']?.toString()] ?? false;
-          final bIsWorkman = workmanPenaltyMap[b['nc_category']?.toString()] ?? false;
-          if (aIsWorkman != bIsWorkman) return bIsWorkman ? 1 : -1;
-          final aPriority = subStatusPriority[a['sub_status']?.toString() ?? 'Aobs'] ?? 0;
-          final bPriority = subStatusPriority[b['sub_status']?.toString() ?? 'Aobs'] ?? 0;
-          return bPriority.compareTo(aPriority);
+          final catA = (a['nc_category'] ?? '').toString();
+          final catB = (b['nc_category'] ?? '').toString();
+          final bool isWorkmanA = workmanPenaltyMap[catA] ?? (catA == 'Service' || catA == 'Quality of Workmanship');
+          final bool isWorkmanB = workmanPenaltyMap[catB] ?? (catB == 'Service' || catB == 'Quality of Workmanship');
+          
+          if (isWorkmanA != isWorkmanB) return isWorkmanA ? -1 : 1;
+
+          final critA = (a['nc_criticality'] ?? a['sub_status'] ?? 'Aobs').toString();
+          final critB = (b['nc_criticality'] ?? b['sub_status'] ?? 'Aobs').toString();
+          final pA = (critA == 'CF') ? 3 : (critA == 'MCF' ? 2 : 1);
+          final pB = (critB == 'CF') ? 3 : (critB == 'MCF' ? 2 : 1);
+          return pB.compareTo(pA);
         });
 
         // Collect detailed points for RichText and finding info
@@ -722,7 +728,7 @@ class ExcelExportService {
           }
           observationPoints.add({
             'text': '${i + 1}. $obsText',
-            'color': _getFontColorForStatus(t['sub_status']?.toString() ?? 'Aobs'),
+            'color': _getFontColorForStatus((t['nc_criticality'] ?? t['sub_status'] ?? 'Aobs').toString()),
           });
         }
 
@@ -732,8 +738,8 @@ class ExcelExportService {
         String finalSubStatus = 'Aobs';
         
         for (final task in taskList) {
-          final sSub = (task['sub_status'] ?? 'Aobs').toString();
-          final sNc = task['nc_category']?.toString();
+          final sSub = (task['nc_criticality'] ?? task['sub_status'] ?? 'Aobs').toString();
+          final sNc = (task['nc_category'] ?? '').toString();
           final p = _calculatePenalties(sSub, sNc, workmanPenaltyMap);
           
           if (p['overall']! > groupOverallPenalty) {
@@ -1073,12 +1079,12 @@ class ExcelExportService {
           final String refName = task['refName'].toString();
           final List<Map<String, String>> points = List<Map<String, String>>.from(task['points'] as List);
           
-          // 1. Header line (Category Name)
+          // 1. Header line (Category Name) - Hidden in Report
           sheet.getRangeByIndex(row, 3, row, 7).merge();
           final refRange = sheet.getRangeByIndex(row, 3);
           refRange.setText('[$refName]');
           cellStyle(row, 3, bold: true, fontColor: '#34495E', hAlign: HAlignType.left);
-          sheet.setRowHeightInPixels(row, 0); // Hide the reference name row
+          sheet.getRangeByIndex(row, 1, row, 10).rowHeight = 0; // Robust Row Hiding
           row++;
           
           // 2. Point lines (one per observation point)
@@ -1099,6 +1105,15 @@ class ExcelExportService {
           
           final int endRow = row - 1;
           
+          // Apply Outside Borders only to the entire group to remove internal gridlines
+          applyOutsideBorders(startRow, 2, endRow, 10);
+          
+          // Apply specific column separators for professional look
+          sheet.getRangeByIndex(startRow, 2, endRow, 2).cellStyle.borders.right.lineStyle = LineStyle.thin;
+          sheet.getRangeByIndex(startRow, 8, endRow, 8).cellStyle.borders.left.lineStyle = LineStyle.thin;
+          sheet.getRangeByIndex(startRow, 9, endRow, 9).cellStyle.borders.left.lineStyle = LineStyle.thin;
+          sheet.getRangeByIndex(startRow, 10, endRow, 10).cellStyle.borders.left.lineStyle = LineStyle.thin;
+
           // 3. Metadata Vertical Merging (Sr No, Status, Scores)
           // Sr No
           final srRange = sheet.getRangeByIndex(startRow, 2, endRow, 2);
@@ -1415,13 +1430,14 @@ class ExcelExportService {
 
   Map<String, int> _calculatePenalties(String subStatus, String? ncCategory, Map<String, bool> workmanPenaltyMap) {
     int overall = 1;
-    switch (subStatus) {
+    final String status = subStatus.toUpperCase();
+    switch (status) {
       case 'CF':  overall = 3; break;
       case 'MCF': overall = 2; break;
       default:    overall = 1;
     }
     
-    final bool isWorkman = workmanPenaltyMap[ncCategory] ?? false;
+    final bool isWorkman = workmanPenaltyMap[ncCategory] ?? (ncCategory == 'Service' || ncCategory == 'Quality of Workmanship');
     return {
       'overall': overall,
       'workman': isWorkman ? overall : 0,
